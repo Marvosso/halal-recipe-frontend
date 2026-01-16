@@ -479,15 +479,16 @@ button.gold-btn:hover {
 
 /* Gold outlined button */
 button.gold-outline {
-  background: transparent;
-  border: 2px solid var(--accent-gold);
-  color: var(--accent-gold);
-  box-shadow: none;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  color: var(--white);
+  box-shadow: var(--shadow-md);
 }
 
 button.gold-outline:hover {
-  background: var(--accent-gold);
-  color: var(--text-color);
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  color: var(--white);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-gold);
 }
 
@@ -570,31 +571,26 @@ button:hover .button-icon-inline {
   flex: 1;
   min-width: 140px;
   padding: 1rem 1.5rem;
-}
-
-.recipe-actions button:first-child {
-  background: linear-gradient(135deg, var(--green-primary) 0%, var(--green-dark) 100%);
-  color: var(--white);
-}
-
-.recipe-actions button:nth-child(2) {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: var(--white);
 }
 
-.recipe-actions button:last-child {
-  background: linear-gradient(135deg, var(--green-light) 0%, var(--green-primary) 100%);
-  color: var(--white);
+.recipe-actions button:hover {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-gold);
 }
 
 .share-community-btn {
-  background: linear-gradient(135deg, var(--primary-green) 0%, var(--green-dark) 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: var(--white);
   gap: 0.5rem;
 }
 
 .share-community-btn:hover {
-  background: linear-gradient(135deg, var(--green-dark) 0%, var(--primary-green) 100%);
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-gold);
 }
 
 /* Results section - card style with fade-in animation */

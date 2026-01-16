@@ -14,6 +14,8 @@
   font-family: "Inter", sans-serif;
   margin-right: 0.75rem;
   margin-bottom: 0.75rem;
+  height: 40px;
+  min-height: 40px;
 }
 
 .settings-trigger-btn:hover {
