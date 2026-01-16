@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAPIBaseURL } from "../utils/apiConfig";
+import logger from "../utils/logger";
 
 /**
  * Creates an axios instance with the auto-detected base URL
@@ -31,9 +32,9 @@ export async function getAxiosInstance() {
   axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-      console.error("API Error:", error);
+      logger.error("API Error:", error);
       if (error.code === "ECONNREFUSED" || error.message.includes("Network Error")) {
-        console.error("Backend server not reachable. Please ensure the server is running.");
+        logger.error("Backend server not reachable. Please ensure the server is running.");
       }
       return Promise.reject(error);
     }

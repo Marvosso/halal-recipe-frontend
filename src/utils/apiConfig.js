@@ -2,6 +2,7 @@
  * API Configuration Utility
  * Automatically detects mobile vs desktop and sets the appropriate backend URL
  */
+import logger from "./logger";
 
 /**
  * Detects if the device is mobile
@@ -59,7 +60,7 @@ async function getNetworkIP() {
     
     if (!RTCPeerConnection) {
       // Fallback to localhost if WebRTC not available
-      console.warn('[API Config] WebRTC not available, using localhost');
+      logger.warn('[API Config] WebRTC not available, using localhost');
       resolve('localhost');
       return;
     }
@@ -85,7 +86,7 @@ async function getNetworkIP() {
               !ip.startsWith('169.254.')) { // Link-local addresses
             resolved = true;
             pc.close();
-            console.log(`[API Config] Detected network IP: ${ip}`);
+            logger.log(`[API Config] Detected network IP: ${ip}`);
             resolve(ip);
             return;
           }
@@ -96,7 +97,7 @@ async function getNetworkIP() {
     pc.createOffer()
       .then(offer => pc.setLocalDescription(offer))
       .catch((error) => {
-        console.warn('[API Config] WebRTC offer failed:', error);
+        logger.warn('[API Config] WebRTC offer failed:', error);
         if (!resolved) {
           resolved = true;
           pc.close();
@@ -109,7 +110,7 @@ async function getNetworkIP() {
       if (!resolved) {
         resolved = true;
         pc.close();
-        console.warn('[API Config] WebRTC timeout, using localhost');
+        logger.warn('[API Config] WebRTC timeout, using localhost');
         resolve('localhost');
       }
     }, 2000);
@@ -125,12 +126,25 @@ async function getBaseURL() {
   const envApiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
   if (envApiUrl) {
     const cleanUrl = envApiUrl.replace(/\/$/, ''); // Remove trailing slash
-    console.log(`[API Config] Using environment variable API URL: ${cleanUrl}`);
+    logger.log(`[API Config] Using environment variable API URL: ${cleanUrl}`);
     return cleanUrl;
   }
   
   // Get the current hostname (works when accessing via network IP)
   const currentHostname = window.location.hostname;
+  
+  // Production fallback: if we're on a production domain (not localhost), use Render backend
+  const isProduction = currentHostname !== 'localhost' && 
+                       currentHostname !== '127.0.0.1' && 
+                       !currentHostname.startsWith('192.168.') &&
+                       !currentHostname.startsWith('10.') &&
+                       !/^(\d{1,3}\.){3}\d{1,3}$/.test(currentHostname);
+  
+  if (isProduction) {
+    const productionUrl = 'https://halal-recipe-backend.onrender.com';
+    logger.log(`[API Config] Using production backend URL: ${productionUrl}`);
+    return productionUrl;
+  }
   
   // If accessing via IP address (not localhost), use that for backend
   if (currentHostname && 
@@ -138,7 +152,7 @@ async function getBaseURL() {
       currentHostname !== '127.0.0.1' &&
       /^(\d{1,3}\.){3}\d{1,3}$/.test(currentHostname)) {
     const backendUrl = `http://${currentHostname}:3000`;
-    console.log(`[API Config] Using current hostname for backend: ${backendUrl}`);
+    logger.log(`[API Config] Using current hostname for backend: ${backendUrl}`);
     return backendUrl;
   }
   
@@ -152,7 +166,7 @@ async function getBaseURL() {
       currentHostname !== '127.0.0.1' &&
       currentHostname !== '0.0.0.0') {
     const backendUrl = `http://${currentHostname}:3000`;
-    console.log(`[API Config] Using current hostname for backend (most reliable for mobile): ${backendUrl}`);
+    logger.log(`[API Config] Using current hostname for backend (most reliable for mobile): ${backendUrl}`);
     return backendUrl;
   }
   
@@ -161,16 +175,16 @@ async function getBaseURL() {
     const ip = await getNetworkIP();
     if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
       const backendUrl = `http://${ip}:3000`;
-      console.log(`[API Config] Using detected network IP for mobile: ${backendUrl}`);
+      logger.log(`[API Config] Using detected network IP for mobile: ${backendUrl}`);
       return backendUrl;
     }
     // If WebRTC fails on mobile, we'll fall through to localhost
     // This should only happen if accessing via localhost on mobile
-    console.warn(`[API Config] WebRTC detection failed on mobile, falling back to localhost`);
+      logger.warn(`[API Config] WebRTC detection failed on mobile, falling back to localhost`);
   }
   
   // Default fallback: use localhost (for desktop or when all else fails)
-  console.log(`[API Config] Using default localhost backend URL`);
+  logger.log(`[API Config] Using default localhost backend URL`);
   return 'http://localhost:3000';
 }
 
@@ -192,7 +206,7 @@ export async function getAPIBaseURL() {
   if (!baseURLPromise) {
     baseURLPromise = getBaseURL().then(url => {
       cachedBaseURL = url;
-      console.log(`[API Config] Using backend URL: ${url}`);
+      logger.log(`[API Config] Using backend URL: ${url}`);
       return url;
     });
   }
