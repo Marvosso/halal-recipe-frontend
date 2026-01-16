@@ -1,14 +1,16 @@
 .settings-trigger-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0;
   background: linear-gradient(135deg, var(--green-light, #4caf50) 0%, var(--green-primary, #2E7D32) 100%);
   color: var(--white, #ffffff);
   border: none;
   border-radius: 12px;
   font-size: 0.9375rem;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: "Inter", sans-serif;
@@ -16,6 +18,9 @@
   margin-bottom: 0.75rem;
   height: 40px;
   min-height: 40px;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  box-sizing: border-box;
 }
 
 .settings-trigger-btn:hover {

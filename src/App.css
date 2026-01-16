@@ -156,6 +156,10 @@ body {
   justify-content: center;
 }
 
+.header-actions > * {
+  vertical-align: middle;
+}
+
 /* Halal Arabic Image */
 .halal-arabic {
   display: block;
