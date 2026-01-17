@@ -27,6 +27,7 @@ export function evaluateItem(itemId, options = {}) {
   let preferenceEnforced = false;
   let inheritedFrom = null;
   let alternatives = [];
+  let references = [];
   let notes = "";
   let eli5 = "";
 
@@ -104,6 +105,11 @@ export function evaluateItem(itemId, options = {}) {
     // Collect alternatives
     if (item.alternatives && Array.isArray(item.alternatives)) {
       alternatives.push(...item.alternatives);
+    }
+
+    // Collect references
+    if (item.references && Array.isArray(item.references)) {
+      references.push(...item.references);
     }
 
     // Update notes and eli5 (prioritize most specific)
@@ -207,9 +213,8 @@ export function evaluateItem(itemId, options = {}) {
   const uniqueTags = [...new Set(tags)];
   const uniqueAlternatives = [...new Set(alternatives)];
   
-  // Get root item for references
-  const rootItem = halalKnowledge[itemId];
-  const references = rootItem?.references || [];
+  // Remove duplicate references
+  const uniqueReferences = [...new Set(references)];
 
   const result = {
     status: adjustedStatus,
@@ -219,7 +224,7 @@ export function evaluateItem(itemId, options = {}) {
     tags: uniqueTags.length > 0 ? uniqueTags : undefined,
     alternatives: uniqueAlternatives.length > 0 ? uniqueAlternatives : undefined,
     notes: notes || halalKnowledge[itemId]?.notes || undefined,
-    references: references.length > 0 ? references : undefined,
+    references: uniqueReferences.length > 0 ? uniqueReferences : undefined,
     aliases: halalKnowledge[itemId]?.aliases || undefined
   };
 

@@ -210,9 +210,7 @@ function App() {
       // Enhance backend results with JSON engine data (if not already using JSON conversion)
       // JSON conversion already includes all engine data, so skip enhancement
       if (!jsonConversionUsed && FEATURES.HALAL_KNOWLEDGE_ENGINE && convertedIssues.length > 0) {
-      
-      // Enhance with Halal Knowledge Model (if enabled)
-      if (FEATURES.HALAL_KNOWLEDGE_ENGINE && convertedIssues.length > 0) {
+        // Enhance with Halal Knowledge Model (if enabled)
         let inheritanceFlags = 0;
         let preferenceEnforcedFlags = 0;
         let maxConfidenceReduction = 1;
