@@ -45,11 +45,21 @@
 .community-tips-content {
   margin-top: 1rem;
   padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+  background: linear-gradient(135deg, #fff4d6 0%, #ffeaa7 100%); /* Slightly darker beige for better contrast */
   border-left: 4px solid #f59e0b;
   border-radius: 12px;
   animation: fadeIn 0.3s ease;
   transition: all 0.3s ease;
+}
+
+/* Light mode text - ensure high contrast with beige background */
+.tips-text {
+  color: #2d3436 !important; /* Dark gray text for better readability on beige */
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  font-weight: 500; /* Slightly bolder for better readability */
 }
 
 /* Dark mode support for community tips */
@@ -60,7 +70,7 @@
   }
 
   .tips-text {
-    color: var(--text-color, #e0e0e0) !important;
+    color: #e0e0e0 !important; /* Light text for dark background */
   }
 
   .tips-header strong {
@@ -75,7 +85,7 @@
 }
 
 [data-theme="dark"] .tips-text {
-  color: var(--text-color, #e0e0e0) !important;
+  color: #e0e0e0 !important; /* Light text for dark background */
 }
 
 [data-theme="dark"] .tips-header strong {
@@ -103,13 +113,7 @@
   font-family: "Inter", sans-serif;
 }
 
-.tips-text {
-  color: var(--text-primary, #1b5e20);
-  font-size: 0.9375rem;
-  line-height: 1.6;
-  margin: 0;
-  font-family: "Inter", sans-serif;
-}
+/* .tips-text moved above for better specificity */
 
 @keyframes fadeIn {
   from {
