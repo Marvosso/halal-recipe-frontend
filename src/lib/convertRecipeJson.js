@@ -132,6 +132,7 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
 
 /**
  * Calculate confidence score based on detected ingredients and user preferences
+ * Score rewards successful replacements and penalizes only when replacements are missing
  */
 function calculateConfidenceScore(detectedIngredients, userPreferences = {}) {
   if (!detectedIngredients || detectedIngredients.length === 0) {
@@ -139,31 +140,51 @@ function calculateConfidenceScore(detectedIngredients, userPreferences = {}) {
   }
   
   const strictness = userPreferences.strictnessLevel || "standard";
-  let baseScore = 100;
+  const totalDetected = detectedIngredients.length;
   
-  // Reduce score for each detected issue
-  detectedIngredients.forEach(item => {
-    const severityMultiplier = item.severity === "high" ? 0.9 : 
-                               item.severity === "medium" ? 0.95 : 0.98;
-    
-    baseScore *= severityMultiplier;
-    
-    // Additional reduction for inheritance chains
-    if (item.engineResult?.trace && item.engineResult.trace.length > 1) {
-      baseScore *= 0.85;
-    }
-    
-    // Additional reduction for preference enforcement
-    if (item.engineResult?.enforcedBy === "user_preferences") {
-      baseScore *= 0.9;
-    }
-  });
+  // Count ingredients WITH successful replacements
+  const withReplacement = detectedIngredients.filter(
+    (item) => item.replacement && item.replacement.trim() !== "" && item.replacement !== "Halal alternative needed"
+  ).length;
   
-  // Adjust for strictness level
+  // Base score: percentage of ingredients with replacements (rewards successful replacements)
+  let baseScore = (withReplacement / totalDetected) * 100;
+  
+  // If all ingredients have replacements, start at 100
+  if (withReplacement === totalDetected) {
+    baseScore = 100;
+  }
+  
+  // Minor adjustments for risk factors (only small reductions since replacements exist)
+  const withInheritance = detectedIngredients.filter(
+    (item) => item.engineResult?.trace && item.engineResult.trace.length > 1
+  ).length;
+  
+  // Small reduction for ingredients with complex inheritance chains (but less severe)
+  if (withInheritance > 0) {
+    // Reduce by 5-10% instead of 15% since replacements exist
+    const inheritancePenalty = withInheritance === 1 ? 0.05 : 0.10;
+    baseScore *= (1 - inheritancePenalty);
+  }
+  
+  // Penalize only for ingredients WITHOUT replacements (this is the real issue)
+  const withoutReplacement = totalDetected - withReplacement;
+  if (withoutReplacement > 0) {
+    // Each missing replacement reduces score by 15-25% depending on severity
+    detectedIngredients.forEach(item => {
+      if (!item.replacement || item.replacement.trim() === "" || item.replacement === "Halal alternative needed") {
+        const missingPenalty = item.severity === "high" ? 0.25 : 
+                              item.severity === "medium" ? 0.20 : 0.15;
+        baseScore -= (baseScore * missingPenalty);
+      }
+    });
+  }
+  
+  // Adjust for strictness level (minor adjustment)
   if (strictness === "strict") {
-    baseScore *= 0.95; // Reduce confidence for strict mode
+    baseScore *= 0.98; // Small reduction for strict mode (was 0.95)
   } else if (strictness === "flexible") {
-    baseScore *= 1.02; // Slightly increase for flexible (capped at 100)
+    baseScore *= 1.01; // Slight increase for flexible (was 1.02, now more conservative)
   }
   
   return Math.max(0, Math.min(100, Math.round(baseScore)));

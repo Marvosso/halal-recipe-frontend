@@ -326,24 +326,29 @@ function App() {
           return existingResult;
         });
         
-        // Adjust confidence based on inheritance flags and preference enforcement
+        // Minor adjustments for inheritance flags and preference enforcement
+        // Only apply small reductions since we're already accounting for replacements in base score
         if (inheritanceFlags > 0 && preferenceEnforcedFlags > 0) {
-          // Both inheritance and preference enforcement: apply combined reduction
-          convertedConfidence = Math.round(convertedConfidence * 0.75);
-          // Also apply min confidence from HKM
-          convertedConfidence = Math.round(convertedConfidence * maxConfidenceReduction);
-        } else if (inheritanceFlags > 0) {
-          // Only inheritance flags
-          if (inheritanceFlags === 1) {
-            convertedConfidence = Math.round(convertedConfidence * 0.85);
-          } else {
-            convertedConfidence = Math.round(convertedConfidence * 0.7);
+          // Both inheritance and preference enforcement: apply small combined reduction
+          convertedConfidence = Math.round(convertedConfidence * 0.95); // Was 0.75, now less severe
+          // Also apply min confidence from HKM (if applicable)
+          if (maxConfidenceReduction < 1) {
+            convertedConfidence = Math.round(convertedConfidence * Math.max(0.95, maxConfidenceReduction));
           }
-          // Also apply min confidence from HKM
-          convertedConfidence = Math.round(convertedConfidence * maxConfidenceReduction);
+        } else if (inheritanceFlags > 0) {
+          // Only inheritance flags - smaller penalty since replacements exist
+          if (inheritanceFlags === 1) {
+            convertedConfidence = Math.round(convertedConfidence * 0.95); // Was 0.85
+          } else {
+            convertedConfidence = Math.round(convertedConfidence * 0.92); // Was 0.7
+          }
+          // Also apply min confidence from HKM (if applicable)
+          if (maxConfidenceReduction < 1) {
+            convertedConfidence = Math.round(convertedConfidence * Math.max(0.95, maxConfidenceReduction));
+          }
         } else if (preferenceEnforcedFlags > 0) {
-          // Only preference enforcement
-          convertedConfidence = Math.round(convertedConfidence * 0.9);
+          // Only preference enforcement - very small reduction
+          convertedConfidence = Math.round(convertedConfidence * 0.98); // Was 0.9
         }
       }
       
