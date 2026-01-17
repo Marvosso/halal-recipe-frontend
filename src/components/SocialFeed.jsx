@@ -29,7 +29,10 @@ function SocialFeed() {
           setPosts(samplePosts);
           localStorage.setItem("halalKitchenPosts", JSON.stringify(samplePosts));
         } else {
-          setPosts(allPosts);
+          // Filter to only show public posts (isPublic === true or undefined for backward compatibility)
+          // For backward compatibility, treat undefined isPublic as public
+          const publicPosts = allPosts.filter(post => post.isPublic === true || post.isPublic === undefined);
+          setPosts(publicPosts);
         }
         
         setLoading(false);

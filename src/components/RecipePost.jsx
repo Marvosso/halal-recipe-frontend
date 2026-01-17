@@ -197,6 +197,97 @@ function RecipePost({ post, onLike, onSave, onComment }) {
             </div>
           </details>
         </div>
+
+        {/* Ingredient Details from Knowledge Model */}
+        {post.ingredients && Array.isArray(post.ingredients) && post.ingredients.length > 0 && (
+          <div className="ingredient-details-section">
+            <details className="ingredient-details">
+              <summary className="ingredient-details-summary">
+                Ingredient Details & Alternatives
+              </summary>
+              <div className="ingredient-details-content">
+                {post.ingredients.map((ingredient, idx) => {
+                  const ingredientName = ingredient?.ingredient || `ingredient-${idx}`;
+                  const status = ingredient?.status || ingredient?.hkmResult?.status || "unknown";
+                  const getStatusColor = () => {
+                    if (status === "halal") return "#0A9D58";
+                    if (status === "conditional" || status === "questionable") return "#FFD166";
+                    if (status === "haram") return "#FF6B6B";
+                    return "#9CA3AF";
+                  };
+
+                  return (
+                    <div key={idx} className="post-ingredient-card">
+                      <div className="post-ingredient-header">
+                        <strong className="post-ingredient-name">{ingredientName}</strong>
+                        <span 
+                          className="post-ingredient-status" 
+                          style={{ color: getStatusColor() }}
+                        >
+                          {status === "halal" && "✅ Halal"}
+                          {status === "conditional" && "⚠️ Conditional"}
+                          {status === "questionable" && "⚠️ Questionable"}
+                          {status === "haram" && "❌ Haram"}
+                          {status === "unknown" && "❓ Unknown"}
+                        </span>
+                      </div>
+
+                      {ingredient?.inheritedFrom && (
+                        <div className="post-ingredient-row">
+                          <span className="post-ingredient-label">Inherited From:</span>
+                          <span className="post-ingredient-value">{ingredient.inheritedFrom}</span>
+                        </div>
+                      )}
+
+                      {ingredient?.replacement && (
+                        <div className="post-ingredient-row">
+                          <span className="post-ingredient-label">Halal Replacement:</span>
+                          <span className="post-ingredient-value">{ingredient.replacement}</span>
+                        </div>
+                      )}
+
+                      {ingredient?.alternatives && Array.isArray(ingredient.alternatives) && ingredient.alternatives.length > 0 && (
+                        <div className="post-ingredient-row">
+                          <span className="post-ingredient-label">Alternatives:</span>
+                          <ul className="post-ingredient-alternatives">
+                            {ingredient.alternatives.map((alt, altIdx) => (
+                              <li key={altIdx}>{alt}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {ingredient?.notes && (
+                        <div className="post-ingredient-row">
+                          <span className="post-ingredient-label">Notes:</span>
+                          <span className="post-ingredient-value">{ingredient.notes}</span>
+                        </div>
+                      )}
+
+                      {ingredient?.eli5 && (
+                        <div className="post-ingredient-row">
+                          <span className="post-ingredient-label">Simple Explanation:</span>
+                          <span className="post-ingredient-value eli5-text">{ingredient.eli5}</span>
+                        </div>
+                      )}
+
+                      {ingredient?.trace && Array.isArray(ingredient.trace) && ingredient.trace.length > 1 && (
+                        <details className="post-ingredient-trace">
+                          <summary className="post-ingredient-trace-summary">Show Ingredient Breakdown</summary>
+                          <ul className="post-ingredient-trace-list">
+                            {ingredient.trace.map((t, traceIdx) => (
+                              <li key={traceIdx}>{t}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        )}
       </div>
 
       {/* Comments Section */}

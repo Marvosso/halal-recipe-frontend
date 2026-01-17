@@ -20,6 +20,30 @@ function HalalStandardPanel({ onSettingsChange }) {
     }
   }, []);
 
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const originalWidth = document.body.style.width;
+      const scrollY = window.scrollY;
+      
+      // Prevent background scrolling
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${scrollY}px`;
+      
+      return () => {
+        // Restore scrolling when modal closes
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.width = originalWidth;
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
+
   const handleStrictnessChange = (level) => {
     setStrictnessLevel(level);
     localStorage.setItem("halalStrictnessLevel", level);
@@ -134,6 +158,9 @@ function HalalStandardPanel({ onSettingsChange }) {
                     <strong>Current:</strong> {getStrictnessDescription(strictnessLevel)}
                   </div>
                 )}
+                <p className="helper-text">
+                  <em>Note: These preferences currently adjust confidence scoring and explanations only. Full jurisprudential rule differentiation is planned for a future update.</em>
+                </p>
               </div>
 
               <div className="settings-section">
@@ -157,6 +184,9 @@ function HalalStandardPanel({ onSettingsChange }) {
                     <strong>Selected:</strong> {schoolOfThought.charAt(0).toUpperCase() + schoolOfThought.slice(1)}
                   </div>
                 )}
+                <p className="helper-text">
+                  <em>Note: These preferences currently adjust confidence scoring and explanations only. Full jurisprudential rule differentiation is planned for a future update.</em>
+                </p>
               </div>
 
               <div className="settings-footer">

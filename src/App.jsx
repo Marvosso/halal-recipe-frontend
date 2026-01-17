@@ -9,6 +9,7 @@ import { RefreshCw, ClipboardCopy, Download, Bookmark, Star, ThumbsUp, ThumbsDow
 import HaramIngredient from "./components/HaramIngredient";
 import SimpleExplanationToggle from "./components/SimpleExplanationToggle";
 import QuickLookup from "./components/QuickLookup";
+import IngredientTreeDisplay from "./components/IngredientTreeDisplay";
 import HalalStandardPanel from "./components/HalalStandardPanel";
 import CommunityTips from "./components/CommunityTips";
 import LanguageSwitcher from "./components/LanguageSwitcher";
@@ -19,6 +20,9 @@ import CreatePostModal from "./components/CreatePostModal";
 import { t } from "./lib/i18n";
 import { useAnalytics } from "./hooks/useAnalytics";
 import logger from "./utils/logger";
+import { evaluateItem } from "./lib/halalEngine";
+import { FEATURES } from "./lib/featureFlags";
+import { convertRecipeWithJson } from "./lib/convertRecipeJson";
 
 function App() {
   const analytics = useAnalytics();
@@ -42,16 +46,6 @@ function App() {
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [showCachedResult, setShowCachedResult] = useState(false);
-  
-  // Form state for recipe submission
-  const [formData, setFormData] = useState({
-    title: "",
-    ingredients: "",
-    instructions: "",
-    notes: "",
-    isPublic: false,
-  });
-  const [showForm, setShowForm] = useState(false);
 
   // Load saved recipes and preferences from localStorage on mount
   useEffect(() => {
@@ -172,24 +166,188 @@ function App() {
     setShowCachedResult(false);
     
     try {
-      const api = await getAxiosInstance();
-      const res = await api.post("/convert", { recipe: trimmedRecipe });
+      let convertedText = "";
+      let convertedIssues = [];
+      let convertedConfidence = 0;
+      let jsonConversionUsed = false;
       
-      // Check if the response contains an error
-      if (res.data?.error) {
-        setError(res.data.error);
-        setConverted("");
-        setIssues([]);
-        setConfidence(0);
-        setIsAccordionOpen(false);
-        setOpenIngredientCards(new Set());
-        return;
+      // Use JSON engine as primary conversion source if enabled
+      if (FEATURES.USE_JSON_CONVERSION_PRIMARY && FEATURES.HALAL_KNOWLEDGE_ENGINE) {
+        try {
+          const jsonResult = convertRecipeWithJson(trimmedRecipe, halalSettings);
+          convertedText = jsonResult.convertedText || "";
+          convertedIssues = Array.isArray(jsonResult.issues) ? jsonResult.issues : [];
+          convertedConfidence = typeof jsonResult.confidenceScore === "number" ? jsonResult.confidenceScore : 0;
+          jsonConversionUsed = true;
+        } catch (jsonError) {
+          console.warn("JSON conversion failed, falling back to backend API:", jsonError);
+          // Fall through to backend API
+        }
       }
       
-      // Update state with response data
-      const convertedText = res.data?.convertedText || "";
-      const convertedIssues = Array.isArray(res.data?.issues) ? res.data.issues : [];
-      const convertedConfidence = typeof res.data?.confidenceScore === "number" ? res.data.confidenceScore : 0;
+      // Fallback to backend API if JSON conversion not used or failed
+      if (!jsonConversionUsed) {
+        const api = await getAxiosInstance();
+        const res = await api.post("/convert", { recipe: trimmedRecipe });
+        
+        // Check if the response contains an error
+        if (res.data?.error) {
+          setError(res.data.error);
+          setConverted("");
+          setIssues([]);
+          setConfidence(0);
+          setIsAccordionOpen(false);
+          setOpenIngredientCards(new Set());
+          return;
+        }
+        
+        // Update state with response data
+        convertedText = res.data?.convertedText || "";
+        convertedIssues = Array.isArray(res.data?.issues) ? res.data.issues : [];
+        convertedConfidence = typeof res.data?.confidenceScore === "number" ? res.data.confidenceScore : 0;
+      }
+      
+      // Enhance backend results with JSON engine data (if not already using JSON conversion)
+      // JSON conversion already includes all engine data, so skip enhancement
+      if (!jsonConversionUsed && FEATURES.HALAL_KNOWLEDGE_ENGINE && convertedIssues.length > 0) {
+      
+      // Enhance with Halal Knowledge Model (if enabled)
+      if (FEATURES.HALAL_KNOWLEDGE_ENGINE && convertedIssues.length > 0) {
+        let inheritanceFlags = 0;
+        let preferenceEnforcedFlags = 0;
+        let maxConfidenceReduction = 1;
+        
+        // Process each ingredient through HKM
+        convertedIssues = convertedIssues.map((issue) => {
+          const existingResult = issue; // Preserve all CSV data
+          
+          if (FEATURES.HALAL_KNOWLEDGE_ENGINE && issue?.ingredient) {
+            const normalizedIngredient = issue.ingredient.toLowerCase().trim().replace(/\s+/g, "_");
+            const engineResult = evaluateItem(normalizedIngredient, {
+              madhab: halalSettings?.schoolOfThought || "no-preference",
+              strictness: halalSettings?.strictnessLevel || "standard"
+            });
+            
+            // Track if preferences were enforced
+            if (engineResult.enforcedBy === "user_preferences") {
+              preferenceEnforcedFlags++;
+            }
+            
+            // Safe Mode: Only downgrade, never upgrade
+            if (FEATURES.HALAL_ENGINE_SAFE_MODE && engineResult.status === "haram") {
+              inheritanceFlags++;
+              // Track minimum confidence from inheritance
+              maxConfidenceReduction = Math.min(maxConfidenceReduction, engineResult.confidence);
+              
+              // Determine validation state
+              let validationState = "derived_haram";
+              if (existingResult.ingredient && issue.ingredient) {
+                // Check if it was in CSV (explicit)
+                validationState = "explicit_haram";
+              } else if (engineResult.enforcedBy === "user_preferences") {
+                validationState = "preference_based";
+              }
+              
+              return {
+                ...existingResult,
+                status: "haram",
+                reason: engineResult.eli5 || existingResult.notes,
+                trace: engineResult.trace || [],
+                confidence: Math.min(existingResult.confidence || 1, engineResult.confidence),
+                hkmResult: engineResult,
+                validationState,
+                preferencesApplied: engineResult.preferences,
+                // Add knowledge model fields
+                inheritedFrom: engineResult.inheritedFrom || existingResult.inheritedFrom,
+                alternatives: engineResult.alternatives || existingResult.alternatives || [],
+                notes: engineResult.notes || existingResult.notes,
+                eli5: engineResult.eli5 || existingResult.eli5,
+                tags: engineResult.tags || existingResult.tags,
+                references: engineResult.references || [],
+                // Map references to quranReference and hadithReference for backward compatibility
+                quranReference: existingResult.quranReference || (engineResult.references && engineResult.references.filter(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran"))[0]) || undefined,
+                hadithReference: existingResult.hadithReference || (engineResult.references && engineResult.references.filter(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim")).join("; ")) || undefined
+              };
+            } else if (engineResult.status === "conditional" && engineResult.trace?.length > 1) {
+              // Track conditional items with inheritance chains
+              inheritanceFlags++;
+              maxConfidenceReduction = Math.min(maxConfidenceReduction, engineResult.confidence);
+              
+              let validationState = "needs_review";
+              if (engineResult.enforcedBy === "user_preferences") {
+                validationState = "preference_based";
+              }
+              
+              return {
+                ...existingResult,
+                trace: engineResult.trace || [],
+                hkmResult: engineResult,
+                hasInheritance: true,
+                validationState,
+                preferencesApplied: engineResult.preferences,
+                // Add knowledge model fields
+                inheritedFrom: engineResult.inheritedFrom || existingResult.inheritedFrom,
+                alternatives: engineResult.alternatives || existingResult.alternatives || [],
+                notes: engineResult.notes || existingResult.notes,
+                eli5: engineResult.eli5 || existingResult.eli5,
+                tags: engineResult.tags || existingResult.tags,
+                references: engineResult.references || []
+              };
+            } else {
+              // Preserve existing result, but add HKM data if available
+              let validationState = existingResult.ingredient ? "explicit_haram" : undefined;
+              if (engineResult.enforcedBy === "user_preferences") {
+                validationState = "preference_based";
+              }
+              
+              return {
+                ...existingResult,
+                trace: engineResult.trace || existingResult.trace || [],
+                hkmResult: engineResult.status !== "unknown" ? engineResult : undefined,
+                validationState,
+                preferencesApplied: engineResult.preferences,
+                // Add knowledge model fields
+                inheritedFrom: engineResult.inheritedFrom || existingResult.inheritedFrom,
+                alternatives: engineResult.alternatives || existingResult.alternatives || [],
+                notes: engineResult.notes || existingResult.notes,
+                eli5: engineResult.eli5 || existingResult.eli5,
+                tags: engineResult.tags || existingResult.tags,
+                references: engineResult.references || []
+              };
+            }
+          }
+          
+          // For CSV-only results, mark as explicit
+          if (issue.ingredient && !issue.hkmResult) {
+            return {
+              ...existingResult,
+              validationState: "explicit_haram"
+            };
+          }
+          
+          return existingResult;
+        });
+        
+        // Adjust confidence based on inheritance flags and preference enforcement
+        if (inheritanceFlags > 0 && preferenceEnforcedFlags > 0) {
+          // Both inheritance and preference enforcement: apply combined reduction
+          convertedConfidence = Math.round(convertedConfidence * 0.75);
+          // Also apply min confidence from HKM
+          convertedConfidence = Math.round(convertedConfidence * maxConfidenceReduction);
+        } else if (inheritanceFlags > 0) {
+          // Only inheritance flags
+          if (inheritanceFlags === 1) {
+            convertedConfidence = Math.round(convertedConfidence * 0.85);
+          } else {
+            convertedConfidence = Math.round(convertedConfidence * 0.7);
+          }
+          // Also apply min confidence from HKM
+          convertedConfidence = Math.round(convertedConfidence * maxConfidenceReduction);
+        } else if (preferenceEnforcedFlags > 0) {
+          // Only preference enforcement
+          convertedConfidence = Math.round(convertedConfidence * 0.9);
+        }
+      }
       
       setConverted(convertedText);
       setIssues(convertedIssues);
@@ -331,65 +489,6 @@ function App() {
     } catch (err) {
       logger.error("Error saving recipe:", err);
       alert("Error saving recipe. Please try again.");
-    }
-  };
-
-  const handleFormChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    
-    const { title, ingredients, instructions, notes, isPublic } = formData;
-    
-    if (!title || !ingredients || !instructions) {
-      alert("Please fill in at least title, ingredients, and instructions.");
-      return;
-    }
-
-    try {
-      if (typeof Storage !== "undefined") {
-        const newRecipe = {
-          id: Date.now().toString(),
-          title: title.trim(),
-          ingredients: ingredients.trim(),
-          instructions: instructions.trim(),
-          notes: notes.trim() || "",
-          savedAt: new Date().toISOString(),
-          isPublic: isPublic || false,
-        };
-
-        if (isPublic) {
-          const updated = [...publicRecipes, newRecipe];
-          setPublicRecipes(updated);
-          localStorage.setItem("halalPublicRecipes", JSON.stringify(updated));
-        } else {
-          const updated = [...savedRecipes, newRecipe];
-          setSavedRecipes(updated);
-          localStorage.setItem("halalRecipes", JSON.stringify(updated));
-        }
-
-        // Reset form
-        setFormData({
-          title: "",
-          ingredients: "",
-          instructions: "",
-          notes: "",
-          isPublic: false,
-        });
-        setShowForm(false);
-        alert(`Recipe ${isPublic ? "published" : "saved"} successfully!`);
-      } else {
-        alert("LocalStorage is not available in your browser.");
-      }
-    } catch (err) {
-      logger.error("Error submitting recipe:", err);
-      alert("Error submitting recipe. Please try again.");
     }
   };
 
@@ -633,22 +732,53 @@ Instructions:
 
   const handlePostCreated = (post) => {
     try {
-      const existingPosts = JSON.parse(localStorage.getItem("halalKitchenPosts") || "[]");
-      const updatedPosts = [post, ...existingPosts];
-      localStorage.setItem("halalKitchenPosts", JSON.stringify(updatedPosts));
+      // Check if post is public
+      const isPublic = post.isPublic === true;
+      
+      if (isPublic) {
+        // Save to public feed
+        const existingPosts = JSON.parse(localStorage.getItem("halalKitchenPosts") || "[]");
+        const updatedPosts = [post, ...existingPosts];
+        localStorage.setItem("halalKitchenPosts", JSON.stringify(updatedPosts));
+        
+        // Switch to feed tab to see the new post
+        setActiveTab("feed");
+        
+        // Scroll to top of feed
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        // Save as private recipe
+        const privateRecipe = {
+          id: post.id,
+          title: post.title,
+          ingredients: post.convertedRecipe || post.originalRecipe || "",
+          instructions: post.description || "",
+          notes: "",
+          savedAt: post.createdAt || new Date().toISOString(),
+          isPublic: false,
+        };
+        
+        const updated = [...savedRecipes, privateRecipe];
+        setSavedRecipes(updated);
+        localStorage.setItem("halalRecipes", JSON.stringify(updated));
+        
+        // Stay on current tab (likely convert tab)
+      }
       
       // Update stats
       const currentConverted = parseInt(localStorage.getItem("userRecipesConverted") || "0");
       localStorage.setItem("userRecipesConverted", (currentConverted + 1).toString());
       
-      // Switch to feed tab to see the new post
-      setActiveTab("feed");
       setShowCreatePostModal(false);
       
-      // Scroll to top of feed
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (isPublic) {
+        alert("Recipe posted to community feed!");
+      } else {
+        alert("Recipe saved privately!");
+      }
     } catch (error) {
       logger.error("Error saving post:", error);
+      alert("Error saving recipe. Please try again.");
     }
   };
 
@@ -788,103 +918,6 @@ Instructions:
           <>
             <QuickLookup onConvertClick={handleQuickLookupConvert} />
             
-            <div className="form-toggle-section">
-              <button 
-                className="toggle-form-btn"
-                onClick={() => setShowForm(!showForm)}
-              >
-                {showForm ? t("hideRecipeForm") : t("submitNewRecipe")}
-              </button>
-            </div>
-
-            {showForm && (
-              <div className="recipe-form-section">
-                <h2>Submit Recipe</h2>
-                <form onSubmit={handleFormSubmit} className="recipe-form">
-                  <div className="form-group">
-                    <label htmlFor="title">Title *</label>
-                    <input
-                      type="text"
-                      id="title"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleFormChange}
-                      required
-                      placeholder="Enter recipe title"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="ingredients">Ingredients *</label>
-                    <textarea
-                      id="ingredients"
-                      name="ingredients"
-                      value={formData.ingredients}
-                      onChange={handleFormChange}
-                      required
-                      placeholder="List ingredients (one per line or comma-separated)"
-                      rows="4"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="instructions">Instructions *</label>
-                    <textarea
-                      id="instructions"
-                      name="instructions"
-                      value={formData.instructions}
-                      onChange={handleFormChange}
-                      required
-                      placeholder="Enter step-by-step instructions"
-                      rows="6"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="notes">Notes (Optional)</label>
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      value={formData.notes}
-                      onChange={handleFormChange}
-                      placeholder="Additional notes or tips"
-                      rows="3"
-                    />
-                  </div>
-                  <div className="form-group checkbox-group">
-                    <label htmlFor="isPublic" className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        id="isPublic"
-                        name="isPublic"
-                        checked={formData.isPublic}
-                        onChange={handleFormChange}
-                      />
-                      <span>Make this recipe public</span>
-                    </label>
-                  </div>
-                  <div className="form-actions">
-                    <button type="submit" className="submit-btn">
-                      {formData.isPublic ? "Publish Recipe" : "Save Recipe"}
-                    </button>
-                    <button 
-                      type="button" 
-                      className="cancel-btn"
-                      onClick={() => {
-                        setShowForm(false);
-                        setFormData({
-                          title: "",
-                          ingredients: "",
-                          instructions: "",
-                          notes: "",
-                          isPublic: false,
-                        });
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
             <div className="input-section">
               <label htmlFor="recipe-input" className="input-label">
                 <img src={halalInputIcon} alt="Recipe Input" className="section-icon" />
@@ -983,7 +1016,25 @@ Instructions:
                 </div>
 
                 <div className="confidence-section">
-                  <h3>{t("confidenceScore")}: {adjustConfidenceScore(safeConfidence)}%</h3>
+                  <div className="confidence-header">
+                    <h3>{t("confidenceScore")}: {adjustConfidenceScore(safeConfidence)}%</h3>
+                    {(() => {
+                      const adjustedScore = adjustConfidenceScore(safeConfidence);
+                      let badgeText = "";
+                      let badgeClass = "";
+                      if (adjustedScore >= 80) {
+                        badgeText = "🟢 High Confidence";
+                        badgeClass = "confidence-badge high";
+                      } else if (adjustedScore >= 50) {
+                        badgeText = "🟡 Needs Review";
+                        badgeClass = "confidence-badge medium";
+                      } else {
+                        badgeText = "🔴 Likely Haram";
+                        badgeClass = "confidence-badge low";
+                      }
+                      return <span className={badgeClass}>{badgeText}</span>;
+                    })()}
+                  </div>
                   <div className="confidence-progress">
                     <div 
                       className="confidence-bar" 
@@ -1063,6 +1114,116 @@ Instructions:
                                       <span className="detail-label">Halal Replacement:</span>
                                       <span className="detail-value">{issue?.replacement || "—"}</span>
                                     </div>
+                                    
+                                    {/* Validation State Badge */}
+                                    {issue?.validationState && (
+                                      <div className="validation-badge-section">
+                                        {issue.validationState === "explicit_haram" && (
+                                          <span className="validation-badge explicit-haram" title="Detected from haram ingredients database">
+                                            📋 Explicit Haram (CSV)
+                                          </span>
+                                        )}
+                                        {issue.validationState === "derived_haram" && (
+                                          <span className="validation-badge derived-haram" title="Inferred through ingredient inheritance chain">
+                                            🔗 Derived Haram (Knowledge Engine)
+                                          </span>
+                                        )}
+                                        {issue.validationState === "preference_based" && (
+                                          <span className="validation-badge preference-based" title="Ruling based on your Halal Standard preferences">
+                                            ⚙️ Preference-Based Ruling
+                                          </span>
+                                        )}
+                                        {issue.validationState === "needs_review" && (
+                                          <span className="validation-badge needs-review" title="May require consultation with a qualified Islamic scholar">
+                                            ⚠️ Needs Scholarly Review
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Preference Note */}
+                                    {issue?.preferencesApplied && (
+                                      <div className="preference-note-section">
+                                        <p className="preference-note">
+                                          Based on your Halal Standard ({halalSettings?.strictnessLevel || "standard"})
+                                          {halalSettings?.schoolOfThought && halalSettings.schoolOfThought !== "no-preference" && (
+                                            <span> and School of Thought ({halalSettings.schoolOfThought})</span>
+                                          )}
+                                        </p>
+                                        <span className="preference-tooltip" title="Different scholars hold different opinions. Adjust your preferences in Profile.">
+                                          ℹ️
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Inherited From */}
+                                    {issue?.inheritedFrom && (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Inherited From:</span>
+                                        <span className="detail-value">
+                                          {issue.inheritedFrom}
+                                          {issue.inheritedFrom === "pork" && " (explicitly prohibited in Quran 2:173)"}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Nested Inheritance Chain Display (from ingredients.json) */}
+                                    {issue?.ingredient && (
+                                      <div className="ingredient-detail-row">
+                                        <IngredientTreeDisplay 
+                                          ingredientName={issue.ingredient} 
+                                          showTree={true}
+                                        />
+                                      </div>
+                                    )}
+                                    
+                                    {/* Alternatives from Knowledge Model */}
+                                    {(issue?.alternatives && Array.isArray(issue.alternatives) && issue.alternatives.length > 0) && (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Alternatives:</span>
+                                        <div className="alternatives-list">
+                                          <ul>
+                                            {issue.alternatives.map((alt, idx) => (
+                                              <li key={idx}>{alt}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Notes from Knowledge Model */}
+                                    {(issue?.notes && issue.notes !== issue.replacement) && (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Knowledge Base Notes:</span>
+                                        <span className="detail-value">{issue.notes}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* ELI5 from Knowledge Model */}
+                                    {issue?.eli5 && (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Simple Explanation:</span>
+                                        <span className="detail-value eli5-value">{issue.eli5}</span>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Derived Ingredient Warning */}
+                                    {issue?.trace && Array.isArray(issue.trace) && issue.trace.length > 1 && (
+                                      <div className="derived-warning-section">
+                                        <p className="derived-warning">
+                                          ⚠️ This ingredient may contain hidden haram sources.
+                                        </p>
+                                        <details className="trace-details">
+                                          <summary className="trace-summary">Show ingredient breakdown</summary>
+                                          <ul className="trace-list">
+                                            {issue.trace.map((t, i) => (
+                                              <li key={i} className="trace-item">{t}</li>
+                                            ))}
+                                          </ul>
+                                        </details>
+                                      </div>
+                                    )}
+                                    
                                     {(issue?.quranReference || issue?.hadithReference) && (
                                       <div className="references-accordion">
                                         <div 
@@ -1086,7 +1247,9 @@ Instructions:
                                           <div className="references-accordion-content">
                                             {simpleExplanationEnabled ? (
                                               <div className="simple-explanation-text">
-                                                {issue?.ingredient && (
+                                                {issue?.eli5 ? (
+                                                  <p>In simple terms: {issue.eli5}</p>
+                                                ) : issue?.ingredient ? (
                                                   <p>
                                                     In simple terms: {issue.ingredient.toLowerCase().includes("pork") || issue.ingredient.toLowerCase().includes("bacon")
                                                       ? "this is made from pork, which is prohibited in Islam."
@@ -1094,6 +1257,8 @@ Instructions:
                                                       ? "this contains alcohol, which is prohibited in Islam."
                                                       : "this ingredient is not halal (permitted) according to Islamic dietary laws."}
                                                   </p>
+                                                ) : (
+                                                  <p>In simple terms: This ingredient is not halal (permitted) according to Islamic dietary laws.</p>
                                                 )}
                                               </div>
                                             ) : (
@@ -1192,6 +1357,8 @@ Instructions:
         originalRecipe={recipe}
         convertedRecipe={converted}
         confidenceScore={adjustConfidenceScore(safeConfidence)}
+        issues={safeIssues}
+        halalSettings={halalSettings}
       />
 
       {/* Bottom Navigation */}
@@ -1199,7 +1366,7 @@ Instructions:
 
       <footer className="app-footer">
         <LanguageSwitcher />
-        <p className="footer-text">© 2024 Halal Kitchen - Making recipes halal-compliant</p>
+        <p className="footer-text">© {new Date().getFullYear()} Halal Kitchen - Making recipes halal-compliant</p>
       </footer>
     </div>
   );

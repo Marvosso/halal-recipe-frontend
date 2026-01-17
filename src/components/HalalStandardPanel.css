@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0;
+  padding: 0.75rem 1.25rem;
   background: linear-gradient(135deg, var(--green-light, #4caf50) 0%, var(--green-primary, #2E7D32) 100%);
   color: var(--white, #ffffff);
   border: none;
@@ -18,9 +18,8 @@
   margin-bottom: 0.75rem;
   height: 40px;
   min-height: 40px;
-  padding-left: 1.25rem;
-  padding-right: 1.25rem;
   box-sizing: border-box;
+  vertical-align: middle;
 }
 
 .settings-trigger-btn:hover {
@@ -44,9 +43,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 1rem;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .settings-panel {
@@ -56,8 +57,12 @@
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(46, 125, 50, 0.16));
   animation: slideUp 0.3s ease;
+  margin: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes fadeIn {
@@ -249,6 +254,24 @@
   font-weight: 600;
 }
 
+.helper-text {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--beige-light, #fafafa);
+  border-left: 3px solid var(--accent-gold, #D4AF37);
+  border-radius: 8px;
+  color: var(--text-secondary, #4a5568);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-family: "Inter", sans-serif;
+  font-style: normal;
+}
+
+.helper-text em {
+  font-style: italic;
+  color: var(--text-secondary, #6b7280);
+}
+
 .settings-footer {
   margin-top: 2rem;
   padding-top: 2rem;
@@ -277,14 +300,27 @@
 }
 
 @media (max-width: 768px) {
+  .settings-overlay {
+    padding: 1rem 1rem 5rem 1rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+
   .settings-panel {
     max-width: 100%;
-    border-radius: 20px;
-    max-height: 95vh;
+    border-radius: 20px 20px 0 0;
+    max-height: calc(100vh - 2rem);
+    margin-top: auto;
+    margin-bottom: 5rem;
   }
 
   .settings-header {
     padding: 1.5rem 1.5rem 1rem 1.5rem;
+    position: sticky;
+    top: 0;
+    background: var(--white, #ffffff);
+    z-index: 1;
+    border-radius: 20px 20px 0 0;
   }
 
   .settings-header h2 {
@@ -309,5 +345,15 @@
 
   .radio-description {
     font-size: 0.8125rem;
+  }
+
+  .settings-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--white, #ffffff);
+    margin-bottom: 0;
+    padding-bottom: 1rem;
+    border-top: 2px solid var(--green-lightest, #c8e6c9);
+    border-radius: 0 0 20px 20px;
   }
 }

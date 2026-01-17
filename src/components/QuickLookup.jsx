@@ -1,11 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, X, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { evaluateItem } from "../lib/halalEngine";
+import { FEATURES } from "../lib/featureFlags";
+import SimpleExplanationToggle from "./SimpleExplanationToggle";
 import "./QuickLookup.css";
 
 function QuickLookup({ onConvertClick }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [simpleExplanationEnabled, setSimpleExplanationEnabled] = useState(false);
 
   // Hardcoded lookup data for common ingredients
   // In production, this would come from the backend
@@ -65,6 +69,39 @@ function QuickLookup({ onConvertClick }) {
     }
   };
 
+  // Existing lookup logic (preserved as fallback)
+  const existingLookupLogic = (searchInput) => {
+    const normalizedTerm = searchInput.toLowerCase().trim();
+    const found = ingredientDatabase[normalizedTerm];
+    
+    if (found) {
+      return found;
+    } else {
+      // Try to find partial matches
+      const partialMatch = Object.keys(ingredientDatabase).find(key => 
+        normalizedTerm.includes(key) || key.includes(normalizedTerm)
+      );
+      
+      if (partialMatch) {
+        return ingredientDatabase[partialMatch];
+      } else {
+        return {
+          status: "unknown",
+          explanation: "We couldn't find information about this ingredient. Please check with a qualified Islamic scholar or use our full recipe converter.",
+          alternatives: []
+        };
+      }
+    }
+  };
+
+  // Load ELI5 preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("simpleExplanationEnabled");
+    if (saved !== null) {
+      setSimpleExplanationEnabled(saved === "true");
+    }
+  }, []);
+
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       setResult(null);
@@ -75,28 +112,78 @@ function QuickLookup({ onConvertClick }) {
     
     // Simulate API call delay
     setTimeout(() => {
-      const normalizedTerm = searchTerm.toLowerCase().trim();
-      const found = ingredientDatabase[normalizedTerm];
+      let result;
       
-      if (found) {
-        setResult(found);
-      } else {
-        // Try to find partial matches
-        const partialMatch = Object.keys(ingredientDatabase).find(key => 
-          normalizedTerm.includes(key) || key.includes(normalizedTerm)
-        );
+      if (FEATURES.HALAL_KNOWLEDGE_ENGINE) {
+        // Use Halal Knowledge Model for intelligent resolution
+        const normalizedTerm = searchTerm.toLowerCase().trim().replace(/\s+/g, "_");
+        const hkmResult = evaluateItem(normalizedTerm);
         
-        if (partialMatch) {
-          setResult(ingredientDatabase[partialMatch]);
+        // Use HKM if it found something, otherwise fallback to existing database
+        if (hkmResult.status !== "unknown") {
+          // Map HKM status to UI status
+          let uiStatus;
+          switch (hkmResult.status) {
+            case "halal":
+              uiStatus = "halal";
+              break;
+            case "haram":
+              uiStatus = "haram";
+              break;
+            case "conditional":
+              uiStatus = "questionable";
+              break;
+            default:
+              uiStatus = "unknown";
+          }
+          
+          // Build inheritance chain display
+          let inheritanceChain = [];
+          if (hkmResult.inheritedFrom) {
+            // Build chain from trace
+            if (hkmResult.trace && hkmResult.trace.length > 1) {
+              inheritanceChain = hkmResult.trace.map(t => {
+                // Extract ingredient name from trace (e.g., "gelatin is conditional" -> "gelatin")
+                const match = t.match(/^(\w+)/);
+                return match ? match[1] : t;
+              });
+            } else {
+              inheritanceChain = [normalizedTerm, hkmResult.inheritedFrom];
+            }
+          }
+          
+          // Extract references from JSON engine
+          const references = hkmResult.references || [];
+          const quranRefs = references.filter(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran"));
+          const hadithRefs = references.filter(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim"));
+          
+          // Convert HKM result to QuickLookup format with full data
+          result = {
+            status: uiStatus,
+            explanation: hkmResult.notes || hkmResult.eli5 || "Status determined by Halal Knowledge Model.",
+            alternatives: hkmResult.alternatives || [],
+            confidence: hkmResult.confidence,
+            trace: hkmResult.trace || [],
+            eli5: hkmResult.eli5 || "",
+            notes: hkmResult.notes || "",
+            inheritedFrom: hkmResult.inheritedFrom || null,
+            inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : null,
+            tags: hkmResult.tags || [],
+            references: references,
+            quranRef: quranRefs.length > 0 ? quranRefs[0] : undefined,
+            hadithRef: hadithRefs.length > 0 ? hadithRefs.join("; ") : undefined,
+            hkmResult: hkmResult // Keep original for reference
+          };
         } else {
-          setResult({
-            status: "unknown",
-            explanation: "We couldn't find information about this ingredient. Please check with a qualified Islamic scholar or use our full recipe converter.",
-            alternatives: []
-          });
+          // Fallback to existing logic if HKM doesn't have the item
+          result = existingLookupLogic(searchTerm);
         }
+      } else {
+        // Use existing lookup logic
+        result = existingLookupLogic(searchTerm);
       }
       
+      setResult(result);
       setIsLoading(false);
     }, 300);
   };
@@ -189,11 +276,82 @@ function QuickLookup({ onConvertClick }) {
           </div>
           
           <div className="result-content">
-            <p className="result-explanation">{result.explanation}</p>
+            {/* ELI5 Toggle */}
+            <div className="quick-lookup-eli5-toggle">
+              <SimpleExplanationToggle
+                onToggle={setSimpleExplanationEnabled}
+                defaultEnabled={simpleExplanationEnabled}
+              />
+            </div>
+            
+            {/* Explanation - Show ELI5 if enabled, full explanation if disabled */}
+            {simpleExplanationEnabled && result.eli5 ? (
+              <div className="eli5-section">
+                <p className="eli5-text">
+                  <strong>In simple terms:</strong> {result.eli5}
+                </p>
+              </div>
+            ) : (
+              <div className="result-explanation-section">
+                <p className="result-explanation">{result.explanation}</p>
+                {result.notes && result.notes !== result.explanation && (
+                  <p className="result-notes">{result.notes}</p>
+                )}
+              </div>
+            )}
+            
+            {/* Inheritance Chain */}
+            {result.inheritanceChain && result.inheritanceChain.length > 1 && (
+              <div className="inheritance-chain-section">
+                <strong className="inheritance-chain-label">Inheritance Chain:</strong>
+                <div className="inheritance-chain">
+                  {result.inheritanceChain.map((item, idx) => (
+                    <React.Fragment key={idx}>
+                      <span className="chain-item">{item.replace(/_/g, " ")}</span>
+                      {idx < result.inheritanceChain.length - 1 && (
+                        <span className="chain-arrow">→</span>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+                {result.inheritedFrom && (
+                  <p className="inheritance-source">
+                    <strong>Source:</strong> {result.inheritedFrom.replace(/_/g, " ")} (explicitly prohibited)
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {result.inheritedFrom && !result.inheritanceChain && (
+              <div className="inheritance-source-section">
+                <p className="inheritance-source">
+                  <strong>Inherited From:</strong> {result.inheritedFrom.replace(/_/g, " ")}
+                </p>
+              </div>
+            )}
+            
+            {result.confidence !== undefined && (
+              <div className="confidence-section">
+                <p className="confidence-score">
+                  <strong>Confidence:</strong> {Math.round(result.confidence * 100)}%
+                </p>
+              </div>
+            )}
+            
+            {result.trace && result.trace.length > 0 && (
+              <details className="trace-details">
+                <summary className="trace-summary">Show Full Breakdown</summary>
+                <ul className="trace-list">
+                  {result.trace.map((step, idx) => (
+                    <li key={idx} className="trace-item">{step}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
             
             {result.alternatives && result.alternatives.length > 0 && (
               <div className="result-alternatives">
-                <strong>Common alternatives:</strong>
+                <strong>Halal Alternatives:</strong>
                 <ul>
                   {result.alternatives.map((alt, idx) => (
                     <li key={idx}>{alt}</li>

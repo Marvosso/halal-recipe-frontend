@@ -237,6 +237,97 @@
   font-weight: 600;
 }
 
+.eli5-section {
+  background: var(--green-bg, #e8f5e9);
+  padding: 1rem;
+  border-radius: 12px;
+  border-left: 4px solid var(--accent-gold, #D4AF37);
+  margin-top: 1rem;
+}
+
+.eli5-text {
+  color: var(--text-primary, #1b5e20);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0;
+  font-family: "Inter", sans-serif;
+}
+
+.eli5-text strong {
+  color: var(--primary-green);
+  font-weight: 600;
+}
+
+.confidence-section {
+  background: var(--card-bg, #FAFAFA);
+  padding: 0.875rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-light, #e0e0e0);
+  margin-top: 1rem;
+}
+
+.confidence-score {
+  color: var(--text-primary, #1b5e20);
+  font-size: 0.9375rem;
+  margin: 0;
+  font-family: "Inter", sans-serif;
+}
+
+.confidence-score strong {
+  color: var(--primary-green);
+  font-weight: 600;
+}
+
+.trace-details {
+  background: var(--white, #ffffff);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--green-lightest, #c8e6c9);
+  margin-top: 1rem;
+}
+
+.trace-summary {
+  color: var(--primary-green);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: "Inter", sans-serif;
+  outline: none;
+}
+
+.trace-summary:hover {
+  color: var(--green-dark, #1b5e20);
+}
+
+.trace-summary::-webkit-details-marker {
+  display: none;
+}
+
+.trace-summary::before {
+  content: "▶ ";
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+}
+
+.trace-details[open] .trace-summary::before {
+  transform: rotate(90deg);
+}
+
+.trace-list {
+  margin: 1rem 0 0 0;
+  padding-left: 1.5rem;
+  color: var(--text-primary, #1b5e20);
+}
+
+.trace-item {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+  font-family: "Inter", sans-serif;
+  font-size: 0.875rem;
+}
+
 .convert-full-recipe-btn {
   margin-top: 0.5rem;
   padding: 0.875rem 1.5rem;
@@ -256,6 +347,98 @@
   background: linear-gradient(135deg, var(--green-dark) 0%, var(--primary-green) 100%);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+/* ELI5 Toggle in Quick Lookup */
+.quick-lookup-eli5-toggle {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-light, #e0e0e0);
+}
+
+/* Result Explanation Section */
+.result-explanation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.result-notes {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  margin: 0;
+  font-style: italic;
+  font-family: "Inter", sans-serif;
+}
+
+/* Inheritance Chain Section */
+.inheritance-chain-section {
+  background: var(--beige-light, #fffbe6);
+  border-left: 4px solid var(--accent-gold, #f59e0b);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.inheritance-chain-label {
+  display: block;
+  color: var(--text-primary, #78350f);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  font-family: "Inter", sans-serif;
+}
+
+.inheritance-chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.chain-item {
+  background: var(--white, #ffffff);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  color: var(--text-primary, #1b5e20);
+  font-size: 0.875rem;
+  border: 1px solid var(--border-light, #e5e7eb);
+  font-family: "Inter", sans-serif;
+  text-transform: capitalize;
+}
+
+.chain-arrow {
+  color: var(--accent-gold, #f59e0b);
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.inheritance-source {
+  color: var(--text-primary, #78350f);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0 0;
+  font-family: "Inter", sans-serif;
+}
+
+.inheritance-source strong {
+  color: var(--text-primary, #78350f);
+  font-weight: 600;
+}
+
+.inheritance-source-section {
+  background: var(--beige-light, #fffbe6);
+  border-left: 4px solid var(--accent-gold, #f59e0b);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.inheritance-source-section .inheritance-source {
+  margin: 0;
 }
 
 @media (max-width: 768px) {

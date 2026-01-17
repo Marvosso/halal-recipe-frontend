@@ -15,7 +15,7 @@ function SEOFooter() {
           <Link to="/app">Recipe Converter</Link>
         </nav>
         <p className="seo-footer-copyright">
-          © 2024 Halal Kitchen - Making recipes halal-compliant
+          © {new Date().getFullYear()} Halal Kitchen - Making recipes halal-compliant
         </p>
       </div>
     </footer>
