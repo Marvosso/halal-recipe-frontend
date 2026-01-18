@@ -43,7 +43,9 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
   });
   
   // Check each known ingredient and alias against recipe text
-  ingredientLookup.forEach(({ mainKey, entry }, lookupKey) => {
+  ingredientLookup.forEach((value, lookupKey) => {
+    const { mainKey, entry } = value;
+    
     // Create search patterns: exact match, with underscores, with spaces
     const searchTerms = [
       lookupKey,
@@ -52,8 +54,9 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
     ];
     
     for (const term of searchTerms) {
-      // Use word boundary regex for accurate detection
+      // Use word boundary regex for accurate detection (case-insensitive)
       const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Create new regex for each test to avoid state issues
       const pattern = new RegExp(`\\b${escapedTerm}\\b`, "gi");
       
       if (pattern.test(recipeText)) {
