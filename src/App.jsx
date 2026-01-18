@@ -1447,6 +1447,13 @@ Instructions:
         halalSettings={halalSettings}
       />
 
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode={authMode}
+      />
+
       {/* Bottom Navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
