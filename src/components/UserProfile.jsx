@@ -258,22 +258,38 @@ function UserProfile() {
           {profile.bio && (
             <p className="profile-bio">{profile.bio}</p>
           )}
-          <button 
-            className="edit-profile-btn"
-            onClick={() => {
-              if (isAuthenticated()) {
-                setIsEditProfileModalOpen(true);
-              } else {
-                alert("Please log in to edit your profile.");
-                // Trigger auth modal via custom event
-                window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "login" } }));
-              }
-            }}
-            aria-label="Edit profile"
-          >
-            <Settings className="settings-icon" />
-            Edit Profile
-          </button>
+          {isAuthenticated() ? (
+            <button 
+              className="edit-profile-btn"
+              onClick={() => setIsEditProfileModalOpen(true)}
+              aria-label="Edit profile"
+            >
+              <Settings className="settings-icon" />
+              Edit Profile
+            </button>
+          ) : (
+            <div className="profile-auth-buttons">
+              <button 
+                className="edit-profile-btn"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "register" } }));
+                }}
+                aria-label="Create account"
+              >
+                <User className="settings-icon" />
+                Create Account
+              </button>
+              <button 
+                className="edit-profile-btn secondary"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "login" } }));
+                }}
+                aria-label="Log in"
+              >
+                Log In
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -98,6 +98,23 @@
   box-shadow: var(--shadow-gold);
 }
 
+.edit-profile-btn.secondary {
+  background: transparent;
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+}
+
+.edit-profile-btn.secondary:hover {
+  background: var(--primary-green);
+  color: var(--white);
+}
+
+.profile-auth-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .settings-icon {
   width: 18px;
   height: 18px;
