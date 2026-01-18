@@ -133,11 +133,15 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
       : "Halal alternative";
     
     // Create search patterns for the original ingredient (handle various formats)
-    const searchPatterns = [
+    // Start with the actual term that was matched during detection
+    const searchPatterns = item.matchedTerm ? [item.matchedTerm] : [];
+    
+    // Add normalized ingredient ID variations
+    searchPatterns.push(
       ingredientId,
       ingredientId.replace(/_/g, " "),
-      ingredientId.replace(/_/g, "-"),
-    ];
+      ingredientId.replace(/_/g, "-")
+    );
     
     // Also check aliases from the knowledge entry
     if (item.hkmEntry?.aliases) {
@@ -148,8 +152,11 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
       });
     }
     
+    // Remove duplicates
+    const uniquePatterns = [...new Set(searchPatterns)];
+    
     // Replace each pattern found in text
-    searchPatterns.forEach(pattern => {
+    uniquePatterns.forEach(pattern => {
       const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regex = new RegExp(`\\b${escapedPattern}\\b`, "gi");
       
