@@ -27,6 +27,11 @@
   transition: color 0.3s ease;
 }
 
+.help-disclaimer {
+  font-weight: 600;
+  color: var(--primary-green);
+}
+
 .help-list {
   margin: 0.5rem 0;
   padding-left: 1.5rem;

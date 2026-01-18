@@ -1,9 +1,9 @@
 /**
  * Frontend Recipe Conversion Engine using JSON Knowledge Base
- * Replaces CSV-based system with hierarchical JSON knowledge engine
+ * Uses shared evaluateItem() from halalEngine.js for consistent evaluation
  */
 
-import { evaluateItem } from "./halalEngine";
+import { evaluateItem, calculateConfidenceScore } from "./halalEngine";
 import { FEATURES } from "./featureFlags";
 import halalKnowledge from "../data/halal_knowledge.json";
 
@@ -71,13 +71,16 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
           
           // Only add if ingredient is haram or conditional
           if (engineResult.status === "haram" || engineResult.status === "conditional") {
-            const displayName = term.replace(/_/g, " "); // Use matched term for display
+            // Get replacement ingredient ID (first alternative)
+            const replacementId = entry?.alternatives?.[0] || engineResult.alternatives?.[0] || null;
             
             detected.push({
-              ingredient: displayName,
+              ingredient_id: normalizedKey, // Internal ID (snake_case)
+              ingredient: normalizedKey, // Keep for backward compatibility
               normalizedName: normalizedKey,
               status: engineResult.status,
-              replacement: entry?.alternatives?.[0] || engineResult.alternatives?.[0] || "Halal alternative needed",
+              replacement_id: replacementId, // Replacement ingredient ID
+              replacement: replacementId, // Keep for backward compatibility (will be formatted in UI)
               alternatives: engineResult.alternatives || entry?.alternatives || [],
               notes: engineResult.notes || entry?.notes || "",
               severity: entry?.confidence_score_base === 0.1 ? "high" : 
@@ -100,30 +103,58 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
 
 /**
  * Replace haram ingredients in recipe text with halal alternatives
+ * Uses ingredient IDs and display mapping for replacements
  */
 function replaceIngredientsInText(recipeText, detectedIngredients) {
   if (!recipeText || typeof recipeText !== "string" || detectedIngredients.length === 0) {
     return recipeText;
   }
   
+  // Import display formatter (use require to avoid circular dependency issues)
+  const { formatIngredientName } = require("./ingredientDisplay");
+  
   let convertedText = recipeText;
   
   detectedIngredients.forEach(item => {
-    const originalName = item.ingredient;
-    const replacement = item.replacement || "Halal alternative";
+    // Get ingredient ID (internal snake_case format)
+    const ingredientId = item.ingredient_id || item.ingredient;
+    const replacementId = item.replacement_id || item.replacement;
     
-    // Create word boundary regex for replacement
-    const pattern = new RegExp(`\\b${originalName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
+    // Get formatted replacement name from display map
+    const replacementDisplay = replacementId && replacementId !== "Halal alternative needed"
+      ? formatIngredientName(replacementId)
+      : "Halal alternative";
     
-    // Replace with highlighting for visibility
-    convertedText = convertedText.replace(pattern, (match) => {
-      // Preserve original case
-      if (match === match.toUpperCase()) {
-        return replacement.toUpperCase();
-      } else if (match[0] === match[0].toUpperCase()) {
-        return replacement.charAt(0).toUpperCase() + replacement.slice(1);
-      }
-      return replacement;
+    // Create search patterns for the original ingredient (handle various formats)
+    const searchPatterns = [
+      ingredientId,
+      ingredientId.replace(/_/g, " "),
+      ingredientId.replace(/_/g, "-"),
+    ];
+    
+    // Also check aliases from the knowledge entry
+    if (item.hkmEntry?.aliases) {
+      searchPatterns.push(...item.hkmEntry.aliases);
+      item.hkmEntry.aliases.forEach(alias => {
+        searchPatterns.push(alias.replace(/_/g, " "));
+        searchPatterns.push(alias.replace(/_/g, "-"));
+      });
+    }
+    
+    // Replace each pattern found in text
+    searchPatterns.forEach(pattern => {
+      const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\b${escapedPattern}\\b`, "gi");
+      
+      convertedText = convertedText.replace(regex, (match) => {
+        // Preserve original case
+        if (match === match.toUpperCase()) {
+          return replacementDisplay.toUpperCase();
+        } else if (match[0] === match[0].toUpperCase()) {
+          return replacementDisplay.charAt(0).toUpperCase() + replacementDisplay.slice(1);
+        }
+        return replacementDisplay;
+      });
     });
   });
   
@@ -132,62 +163,82 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
 
 /**
  * Calculate confidence score based on detected ingredients and user preferences
- * Score rewards successful replacements and penalizes only when replacements are missing
+ * Uses SHARED calculateConfidenceScore from halalEngine.js for consistency
+ * Applies recipe-level penalties (missing replacements) on top of per-ingredient scores
  */
-function calculateConfidenceScore(detectedIngredients, userPreferences = {}) {
+function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {}, hasSubstitutions = false) {
   if (!detectedIngredients || detectedIngredients.length === 0) {
-    return 100;
+    return { score: 100, confidence_type: hasSubstitutions ? "post_conversion" : "classification" };
   }
   
   const strictness = userPreferences.strictnessLevel || "standard";
-  const totalDetected = detectedIngredients.length;
   
-  // Count ingredients WITH successful replacements
-  const withReplacement = detectedIngredients.filter(
-    (item) => item.replacement && item.replacement.trim() !== "" && item.replacement !== "Halal alternative needed"
-  ).length;
+  // Use shared confidence scoring from halalEngine for each ingredient
+  // Aggregate all ingredient confidence impacts
+  let aggregatedImpact = 0;
+  let maxBaseConfidence = 1.0;
+  let hasAnyInheritance = false;
   
-  // Base score: percentage of ingredients with replacements (rewards successful replacements)
-  let baseScore = (withReplacement / totalDetected) * 100;
-  
-  // If all ingredients have replacements, start at 100
-  if (withReplacement === totalDetected) {
-    baseScore = 100;
+  for (const item of detectedIngredients) {
+    const engineResult = item.engineResult || {};
+    const impact = engineResult.confidenceImpact || item.confidenceImpact || 0;
+    
+    // Track most severe status (lowest base confidence)
+    const itemStatus = engineResult.status || item.status || "unknown";
+    const itemBaseConfidence = itemStatus === "haram" ? 0.0 :
+                               itemStatus === "conditional" ? 0.6 :
+                               itemStatus === "questionable" ? 0.5 :
+                               itemStatus === "unknown" ? 0.4 : 1.0;
+    
+    if (itemBaseConfidence < maxBaseConfidence) {
+      maxBaseConfidence = itemBaseConfidence;
+    }
+    
+    // Aggregate confidence impacts
+    if (impact < 0) {
+      aggregatedImpact += impact;
+    }
+    
+    // Track inheritance
+    if (engineResult.inheritedFrom || item.inheritedFrom) {
+      hasAnyInheritance = true;
+    }
   }
   
-  // Minor adjustments for risk factors (only small reductions since replacements exist)
+  // Use shared calculateConfidenceScore from halalEngine
+  let baseScore = calculateConfidenceScore(
+    maxBaseConfidence,
+    aggregatedImpact,
+    strictness,
+    hasAnyInheritance
+  );
+  
+  // Additional recipe-level penalties (post-conversion only)
+  if (hasSubstitutions) {
+    const withoutReplacement = detectedIngredients.filter(
+      (item) => !item.replacement_id || item.replacement_id.trim() === "" || item.replacement_id === "Halal alternative needed"
+    ).length;
+    
+    if (withoutReplacement > 0) {
+      // Missing replacement is a critical issue: reduce by 25% per missing item
+      baseScore *= Math.pow(0.75, withoutReplacement);
+    }
+  }
+  
+  // Additional inheritance penalty for recipes with multiple inherited ingredients
   const withInheritance = detectedIngredients.filter(
-    (item) => item.engineResult?.trace && item.engineResult.trace.length > 1
+    (item) => item.engineResult?.inheritedFrom || item.inheritedFrom
   ).length;
   
-  // Small reduction for ingredients with complex inheritance chains (but less severe)
-  if (withInheritance > 0) {
-    // Reduce by 5-10% instead of 15% since replacements exist
-    const inheritancePenalty = withInheritance === 1 ? 0.05 : 0.10;
-    baseScore *= (1 - inheritancePenalty);
+  if (withInheritance > 1) {
+    // Extra 5% penalty for multiple inheritance chains
+    baseScore *= 0.95;
   }
   
-  // Penalize only for ingredients WITHOUT replacements (this is the real issue)
-  const withoutReplacement = totalDetected - withReplacement;
-  if (withoutReplacement > 0) {
-    // Each missing replacement reduces score by 15-25% depending on severity
-    detectedIngredients.forEach(item => {
-      if (!item.replacement || item.replacement.trim() === "" || item.replacement === "Halal alternative needed") {
-        const missingPenalty = item.severity === "high" ? 0.25 : 
-                              item.severity === "medium" ? 0.20 : 0.15;
-        baseScore -= (baseScore * missingPenalty);
-      }
-    });
-  }
-  
-  // Adjust for strictness level (minor adjustment)
-  if (strictness === "strict") {
-    baseScore *= 0.98; // Small reduction for strict mode (was 0.95)
-  } else if (strictness === "flexible") {
-    baseScore *= 1.01; // Slight increase for flexible (was 1.02, now more conservative)
-  }
-  
-  return Math.max(0, Math.min(100, Math.round(baseScore)));
+  return {
+    score: Math.max(0, Math.min(100, Math.round(baseScore))),
+    confidence_type: hasSubstitutions ? "post_conversion" : "classification"
+  };
 }
 
 /**
@@ -220,19 +271,24 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
     
     // Step 2: Replace ingredients in text
     const convertedText = replaceIngredientsInText(trimmedText, detectedIngredients);
+    const hasSubstitutions = convertedText !== trimmedText;
     
-    // Step 3: Calculate confidence score
-    const confidenceScore = calculateConfidenceScore(detectedIngredients, userPreferences);
+    // Step 3: Calculate confidence score with type (uses shared scoring from halalEngine)
+    const confidenceResult = calculateRecipeConfidenceScore(detectedIngredients, userPreferences, hasSubstitutions);
+    const confidenceScore = confidenceResult.score;
+    const confidenceType = confidenceResult.confidence_type;
     
-    // Step 4: Format issues for UI
+    // Step 4: Format issues for UI (using ingredient IDs)
     const issues = detectedIngredients.map((item) => {
       const references = [];
       if (item.quranReference) references.push(item.quranReference);
       if (item.hadithReference) references.push(item.hadithReference);
       
       return {
-        ingredient: item.ingredient,
-        replacement: item.replacement,
+        ingredient_id: item.ingredient_id || item.ingredient, // Internal ID
+        ingredient: item.ingredient_id || item.ingredient, // Keep for backward compatibility
+        replacement_id: item.replacement_id || item.replacement, // Replacement ID
+        replacement: item.replacement_id || item.replacement, // Keep for backward compatibility
         notes: item.notes,
         severity: item.severity,
         confidence: item.confidence,
@@ -257,6 +313,7 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
       convertedText: convertedText,
       issues: issues,
       confidenceScore: confidenceScore,
+      confidence_type: confidenceType, // "classification" or "post_conversion"
       source: "json_engine" // Mark as JSON-based conversion
     };
   } catch (error) {

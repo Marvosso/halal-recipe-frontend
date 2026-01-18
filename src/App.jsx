@@ -17,12 +17,16 @@ import TabNavigation from "./components/TabNavigation";
 import SocialFeed from "./components/SocialFeed";
 import UserProfile from "./components/UserProfile";
 import CreatePostModal from "./components/CreatePostModal";
+import AuthModal from "./components/AuthModal";
 import { t } from "./lib/i18n";
 import { useAnalytics } from "./hooks/useAnalytics";
 import logger from "./utils/logger";
 import { evaluateItem } from "./lib/halalEngine";
 import { FEATURES } from "./lib/featureFlags";
 import { convertRecipeWithJson } from "./lib/convertRecipeJson";
+import { formatIngredientName } from "./lib/ingredientDisplay";
+import { isAuthenticated, getUserData, getCurrentUser, clearAuth } from "./api/authApi";
+import { createRecipe } from "./api/recipesApi";
 
 function App() {
   const analytics = useAnalytics();
@@ -44,11 +48,44 @@ function App() {
   });
   const [activeTab, setActiveTab] = useState("convert");
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState("login"); // "login" or "register"
+  const [user, setUser] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
   const [showCachedResult, setShowCachedResult] = useState(false);
 
-  // Load saved recipes and preferences from localStorage on mount
+  // Listen for auth modal trigger
   useEffect(() => {
+    const handleShowAuthModal = (e) => {
+      const mode = e.detail?.mode || "login";
+      setAuthMode(mode);
+      setShowAuthModal(true);
+    };
+    
+    window.addEventListener("showAuthModal", handleShowAuthModal);
+    return () => window.removeEventListener("showAuthModal", handleShowAuthModal);
+  }, []);
+
+  // Load user data and saved recipes on mount
+  useEffect(() => {
+    // Check authentication and load user
+    if (isAuthenticated()) {
+      getCurrentUser().then((userData) => {
+        if (userData) {
+          setUser(userData);
+        }
+      }).catch((err) => {
+        logger.error("Error loading user:", err);
+        clearAuth();
+      });
+    } else {
+      // Try loading from localStorage
+      const userData = getUserData();
+      if (userData) {
+        setUser(userData);
+      }
+    }
+
     try {
       if (typeof Storage !== "undefined") {
         const saved = localStorage.getItem("halalRecipes");
@@ -550,6 +587,32 @@ function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleReportSubstitution = (issue, idx) => {
+    if (!issue) return;
+    
+    const ingredientName = issue?.ingredient_id || issue?.ingredient || `ingredient-${idx}`;
+    const replacementName = issue?.replacement_id || issue?.replacement || "N/A";
+    
+    // Store report locally (ready for backend later)
+    try {
+      const reports = JSON.parse(localStorage.getItem("halalKitchenReports") || "[]");
+      const report = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        ingredient: ingredientName,
+        replacement: replacementName,
+        status: "pending",
+      };
+      reports.push(report);
+      localStorage.setItem("halalKitchenReports", JSON.stringify(reports));
+      
+      alert("Thank you for your report. We'll review this substitution.");
+    } catch (err) {
+      logger.error("Error saving report:", err);
+      alert("Unable to save report. Please try again.");
+    }
+  };
+
   const deleteSavedRecipe = (id, isPublic = false) => {
     if (!id) return;
 
@@ -733,39 +796,51 @@ Instructions:
     setShowCreatePostModal(true);
   };
 
-  const handlePostCreated = (post) => {
+  const handlePostCreated = async (post) => {
     try {
-      // Check if post is public
       const isPublic = post.isPublic === true;
       
-      if (isPublic) {
-        // Save to public feed
-        const existingPosts = JSON.parse(localStorage.getItem("halalKitchenPosts") || "[]");
-        const updatedPosts = [post, ...existingPosts];
-        localStorage.setItem("halalKitchenPosts", JSON.stringify(updatedPosts));
-        
-        // Switch to feed tab to see the new post
-        setActiveTab("feed");
-        
-        // Scroll to top of feed
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      // If authenticated and saved to API, handle UI updates
+      if (isAuthenticated() && post._fromAPI === true) {
+        // Recipe was saved to API
+        if (isPublic) {
+          // Switch to feed tab to see the new post
+          setActiveTab("feed");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          alert("Recipe posted to community feed!");
+          // Refresh feed after a short delay
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          alert("Recipe saved privately to your account!");
+        }
       } else {
-        // Save as private recipe
-        const privateRecipe = {
-          id: post.id,
-          title: post.title,
-          ingredients: post.convertedRecipe || post.originalRecipe || "",
-          instructions: post.description || "",
-          notes: "",
-          savedAt: post.createdAt || new Date().toISOString(),
-          isPublic: false,
-        };
-        
-        const updated = [...savedRecipes, privateRecipe];
-        setSavedRecipes(updated);
-        localStorage.setItem("halalRecipes", JSON.stringify(updated));
-        
-        // Stay on current tab (likely convert tab)
+        // Guest mode or API failed - use localStorage
+        if (isPublic) {
+          // Save to public feed (localStorage)
+          const existingPosts = JSON.parse(localStorage.getItem("halalKitchenPosts") || "[]");
+          const updatedPosts = [post, ...existingPosts];
+          localStorage.setItem("halalKitchenPosts", JSON.stringify(updatedPosts));
+          setActiveTab("feed");
+          alert("Recipe saved locally. Log in to post publicly and sync across devices.");
+        } else {
+          // Save as private recipe (localStorage)
+          const privateRecipe = {
+            id: post.id,
+            title: post.title,
+            ingredients: post.convertedRecipe || post.originalRecipe || "",
+            instructions: post.description || "",
+            notes: "",
+            savedAt: post.createdAt || new Date().toISOString(),
+            isPublic: false,
+          };
+          
+          const updated = [...savedRecipes, privateRecipe];
+          setSavedRecipes(updated);
+          localStorage.setItem("halalRecipes", JSON.stringify(updated));
+          alert("Recipe saved privately!");
+        }
       }
       
       // Update stats
@@ -773,12 +848,6 @@ Instructions:
       localStorage.setItem("userRecipesConverted", (currentConverted + 1).toString());
       
       setShowCreatePostModal(false);
-      
-      if (isPublic) {
-        alert("Recipe posted to community feed!");
-      } else {
-        alert("Recipe saved privately!");
-      }
     } catch (error) {
       logger.error("Error saving post:", error);
       alert("Error saving recipe. Please try again.");
@@ -911,7 +980,10 @@ Instructions:
               <LanguageSwitcher />
             </div>
           </div>
-          <h1>{t("halalKitchen")}</h1>
+          <h1>
+            {t("halalKitchen")}
+            <span className="beta-label" title="This is a beta version. Please verify guidance with trusted scholars.">Beta</span>
+          </h1>
         </div>
       )}
 
@@ -1097,9 +1169,9 @@ Instructions:
                                   }}
                                 >
                                   <div className="ingredient-card-title">
-                                    <strong>{issue?.ingredient || "—"}</strong>
+                                    <strong>{formatIngredientName(issue?.ingredient_id || issue?.ingredient || "—")}</strong>
                                     <span className="ingredient-replacement-preview">
-                                      → {issue?.replacement || "—"}
+                                      → {formatIngredientName(issue?.replacement_id || issue?.replacement || "—")}
                                     </span>
                                   </div>
                                   <span className="ingredient-card-icon">
@@ -1111,11 +1183,11 @@ Instructions:
                                   <div className="ingredient-card-content">
                                     <div className="ingredient-detail-row">
                                       <span className="detail-label">Original:</span>
-                                      <span className="detail-value">{issue?.ingredient || "—"}</span>
+                                      <span className="detail-value">{formatIngredientName(issue?.ingredient_id || issue?.ingredient || "—")}</span>
                                     </div>
                                     <div className="ingredient-detail-row">
                                       <span className="detail-label">Halal Replacement:</span>
-                                      <span className="detail-value">{issue?.replacement || "—"}</span>
+                                      <span className="detail-value">{formatIngredientName(issue?.replacement_id || issue?.replacement || "—")}</span>
                                     </div>
                                     
                                     {/* Validation State Badge */}
@@ -1300,6 +1372,17 @@ Instructions:
                                       ingredient={issue?.ingredient}
                                       replacement={issue?.replacement}
                                     />
+                                    
+                                    {/* Report Incorrect Substitution */}
+                                    <div className="report-section">
+                                      <button
+                                        className="report-button"
+                                        onClick={() => handleReportSubstitution(issue, idx)}
+                                        aria-label="Report incorrect substitution"
+                                      >
+                                        Report incorrect substitution
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1369,7 +1452,7 @@ Instructions:
 
       <footer className="app-footer">
         <LanguageSwitcher />
-        <p className="footer-text">© {new Date().getFullYear()} Halal Kitchen - Making recipes halal-compliant</p>
+        <p className="footer-text">© {new Date().getFullYear()} Halal Kitchen. Providing halal recipe conversion guidance.</p>
       </footer>
     </div>
   );

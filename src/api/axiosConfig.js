@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getAPIBaseURL } from "../utils/apiConfig";
+import { getAuthToken } from "./authApi";
 import logger from "../utils/logger";
 
 /**
@@ -15,18 +16,41 @@ let axiosInstance = null;
  */
 export async function getAxiosInstance() {
   if (axiosInstance) {
+    // Update auth token in headers if available
+    const token = getAuthToken();
+    if (token) {
+      axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    } else {
+      delete axiosInstance.defaults.headers.common["Authorization"];
+    }
     return axiosInstance;
   }
   
   const baseURL = await getAPIBaseURL();
+  const token = getAuthToken();
   
   axiosInstance = axios.create({
     baseURL: baseURL,
     timeout: 30000, // 30 second timeout
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
     }
   });
+  
+  // Add request interceptor to include auth token
+  axiosInstance.interceptors.request.use(
+    (config) => {
+      const token = getAuthToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
   
   // Add response interceptor for error handling
   axiosInstance.interceptors.response.use(

@@ -44,6 +44,53 @@
   }
 }
 
+.form-error-message {
+  padding: 0.875rem 1rem;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+[data-theme="dark"] .form-error-message {
+  background: #7f1d1d;
+  border-color: #991b1b;
+  color: #fecaca;
+}
+
+.form-info-message {
+  padding: 0.875rem 1rem;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  border-radius: 12px;
+  color: #1e40af;
+  font-size: 0.875rem;
+  font-family: "Inter", sans-serif;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.form-info-message a {
+  color: var(--primary-green, #0A9D58);
+  text-decoration: underline;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-info-message a:hover {
+  color: var(--green-dark, #059669);
+}
+
+[data-theme="dark"] .form-info-message {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+  color: #bfdbfe;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;

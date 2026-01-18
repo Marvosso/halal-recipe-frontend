@@ -17,6 +17,15 @@
   transition: border-color 0.3s ease;
 }
 
+.profile-photo-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--primary-green, #0A9D58);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
 .profile-avatar-large {
   flex-shrink: 0;
 }
@@ -179,6 +188,19 @@
 .profile-tab.active {
   color: var(--primary-green);
   border-bottom-color: var(--accent-gold);
+}
+
+.profile-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.profile-tab:disabled:hover {
+  color: var(--text-secondary);
+  border-bottom-color: transparent;
+  transform: none;
 }
 
 .profile-posts {

@@ -21,6 +21,19 @@ function HelpModal({ isOpen, onClose }) {
         </section>
 
         <section className="help-section">
+          <h3 className="help-section-title">Important Disclaimer</h3>
+          <p className="help-text help-disclaimer">
+            <strong>Halal Kitchen provides guidance, not religious rulings.</strong> Always verify with trusted scholars.
+          </p>
+          <p className="help-text">
+            Our converter uses knowledge bases and general Islamic dietary principles. Different schools of 
+            thought and scholars may have varying opinions on certain ingredients. For matters of religious 
+            importance, please consult with qualified Islamic scholars or halal certification authorities 
+            in your area.
+          </p>
+        </section>
+
+        <section className="help-section">
           <h3 className="help-section-title">How the Converter Works</h3>
           <p className="help-text">
             Our converter analyzes your recipe ingredients and:
@@ -53,14 +66,14 @@ function HelpModal({ isOpen, onClose }) {
         <section className="help-section">
           <h3 className="help-section-title">Learn More</h3>
           <div className="help-links">
-            <button className="help-link-btn" onClick={() => alert("This feature is coming soon!")}>
-              How substitutions are chosen
+            <button className="help-link-btn" onClick={() => alert("Coming soon: Detailed guide on how substitutions are chosen")}>
+              How substitutions are chosen <span style={{opacity: 0.7, fontSize: '0.875rem'}}>(Coming soon)</span>
             </button>
-            <button className="help-link-btn" onClick={() => alert("This feature is coming soon!")}>
-              Understanding halal differences
+            <button className="help-link-btn" onClick={() => alert("Coming soon: Guide to understanding halal differences")}>
+              Understanding halal differences <span style={{opacity: 0.7, fontSize: '0.875rem'}}>(Coming soon)</span>
             </button>
-            <button className="help-link-btn" onClick={() => alert("This feature is coming soon!")}>
-              Common ingredient questions
+            <button className="help-link-btn" onClick={() => alert("Coming soon: Common ingredient questions and answers")}>
+              Common ingredient questions <span style={{opacity: 0.7, fontSize: '0.875rem'}}>(Coming soon)</span>
             </button>
           </div>
         </section>

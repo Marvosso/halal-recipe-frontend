@@ -3,6 +3,9 @@ import { X, Image, Video, Hash, Send } from "lucide-react";
 import MediaUploader from "./MediaUploader";
 import { evaluateItem } from "../lib/halalEngine";
 import { FEATURES } from "../lib/featureFlags";
+import { createRecipe } from "../api/recipesApi";
+import { getUserData, isAuthenticated } from "../api/authApi";
+import logger from "../utils/logger";
 import "./CreatePostModal.css";
 
 function CreatePostModal({ isOpen, onClose, onPost, originalRecipe, convertedRecipe, confidenceScore, issues = [], halalSettings = {} }) {
@@ -12,99 +15,159 @@ function CreatePostModal({ isOpen, onClose, onPost, originalRecipe, convertedRec
   const [category, setCategory] = useState("");
   const [mediaFiles, setMediaFiles] = useState([]);
   const [displayName, setDisplayName] = useState("You");
-  const [sharePublicly, setSharePublicly] = useState(false);
+  const [sharePublicly, setSharePublicly] = useState(false); // Default to private - user must explicitly choose to post publicly
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    // Load profile display name
-    try {
-      const saved = localStorage.getItem("userProfile");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.displayName) {
-          setDisplayName(parsed.displayName);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading profile:", error);
+    // Load user data from API/auth
+    const userData = getUserData();
+    if (userData?.displayName) {
+      setDisplayName(userData.displayName);
     }
   }, []);
 
-  const handleSubmit = (e) => {
+  // Reset form when modal opens (ensure private is default)
+  useEffect(() => {
+    if (isOpen) {
+      setSharePublicly(false); // Always default to private when modal opens
+      setError("");
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     
     if (!title.trim()) {
-      alert("Please enter a recipe title");
+      setError("Please enter a recipe title");
       return;
     }
 
-    // Enhance issues with Halal Knowledge Model data
-    let expandedIssues = [];
-    if (FEATURES.HALAL_KNOWLEDGE_ENGINE && Array.isArray(issues) && issues.length > 0) {
-      expandedIssues = issues.map((issue) => {
-        if (issue?.ingredient) {
-          const normalizedIngredient = issue.ingredient.toLowerCase().trim().replace(/\s+/g, "_");
-          const engineResult = evaluateItem(normalizedIngredient, {
-            madhab: halalSettings?.schoolOfThought || "no-preference",
-            strictness: halalSettings?.strictnessLevel || "standard"
-          });
-          
-          return {
-            ...issue,
-            // Add knowledge model fields
-            inheritedFrom: engineResult.inheritedFrom || issue.inheritedFrom,
-            alternatives: engineResult.alternatives || issue.alternatives,
-            notes: engineResult.notes || issue.notes,
-            eli5: engineResult.eli5 || issue.eli5,
-            tags: engineResult.tags || issue.tags,
-            trace: engineResult.trace || issue.trace || [],
-            hkmResult: engineResult
+    // Check authentication for posting (both public and private require login)
+    if (!isAuthenticated()) {
+      setError("Please log in to save recipes");
+      // Prompt user to login
+      setTimeout(() => {
+        onClose();
+        window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "login" } }));
+      }, 2000);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Enhance issues with Halal Knowledge Model data
+      let expandedIssues = [];
+      if (FEATURES.HALAL_KNOWLEDGE_ENGINE && Array.isArray(issues) && issues.length > 0) {
+        expandedIssues = issues.map((issue) => {
+          if (issue?.ingredient) {
+            const normalizedIngredient = issue.ingredient.toLowerCase().trim().replace(/\s+/g, "_");
+            const engineResult = evaluateItem(normalizedIngredient, {
+              madhab: halalSettings?.schoolOfThought || "no-preference",
+              strictness: halalSettings?.strictnessLevel || "standard"
+            });
+            
+            return {
+              ...issue,
+              inheritedFrom: engineResult.inheritedFrom || issue.inheritedFrom,
+              alternatives: engineResult.alternatives || issue.alternatives,
+              notes: engineResult.notes || issue.notes,
+              eli5: engineResult.eli5 || issue.eli5,
+              tags: engineResult.tags || issue.tags,
+              trace: engineResult.trace || issue.trace || [],
+              hkmResult: engineResult
+            };
+          }
+          return issue;
+        });
+      } else {
+        expandedIssues = issues;
+      }
+
+      // Convert media files to URLs (for now, use object URLs - can be uploaded to server later)
+      const mediaUrls = mediaFiles.map((file) => URL.createObjectURL(file));
+
+      const recipeData = {
+        title: title.trim(),
+        description: description.trim(),
+        originalRecipe: originalRecipe || "",
+        convertedRecipe: convertedRecipe || "",
+        confidenceScore: confidenceScore || 0,
+        category: category || "Main Course",
+        hashtags: hashtags
+          .split(" ")
+          .filter((tag) => tag.trim())
+          .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)),
+        mediaUrls: mediaUrls,
+        isPublic: sharePublicly,
+        ingredients: expandedIssues,
+        instructions: description.trim()
+      };
+
+      // If authenticated, post to API (both public and private); otherwise fall back to localStorage
+      let savedRecipe;
+      if (isAuthenticated()) {
+        try {
+          // Post to API whether public or private
+          savedRecipe = await createRecipe(recipeData);
+          // Mark as API-saved for App.jsx to handle correctly
+          savedRecipe._fromAPI = true;
+        } catch (apiError) {
+          logger.error("Error creating recipe via API:", apiError);
+          // Fall back to localStorage if API fails
+          savedRecipe = {
+            id: `local_${Date.now()}`,
+            ...recipeData,
+            userId: getUserData()?.id || "current_user",
+            username: displayName || "You",
+            mediaType: "image",
+            likes: 0,
+            comments: 0,
+            shares: 0,
+            isLiked: false,
+            isSaved: false,
+            createdAt: new Date().toISOString(),
+            _fromAPI: false
           };
         }
-        return issue;
-      });
-    } else {
-      expandedIssues = issues;
+      } else {
+        // Not authenticated - use localStorage fallback (guest mode)
+        savedRecipe = {
+          id: `local_${Date.now()}`,
+          ...recipeData,
+          userId: "guest_user",
+          username: displayName || "Guest",
+          mediaType: "image",
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          isLiked: false,
+          isSaved: false,
+          createdAt: new Date().toISOString(),
+          _fromAPI: false
+        };
+      }
+
+      if (onPost) {
+        onPost(savedRecipe);
+      }
+
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setHashtags("");
+      setCategory("");
+      setMediaFiles([]);
+      setSharePublicly(false);
+      onClose();
+    } catch (err) {
+      logger.error("Error creating recipe:", err);
+      setError(err.error || "Failed to create recipe. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const post = {
-      id: Date.now().toString(),
-      userId: "current_user",
-      username: displayName || "You",
-      title: title.trim(),
-      description: description.trim(),
-      originalRecipe: originalRecipe || "",
-      convertedRecipe: convertedRecipe || "",
-      confidenceScore: confidenceScore || 0,
-      category: category || "Main Course",
-      hashtags: hashtags
-        .split(" ")
-        .filter((tag) => tag.trim())
-        .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)),
-      mediaUrls: mediaFiles.map((file) => URL.createObjectURL(file)),
-      mediaType: "image",
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      isLiked: false,
-      isSaved: false,
-      isPublic: sharePublicly,
-      createdAt: new Date().toISOString(),
-      // Include expanded ingredient data from knowledge model
-      ingredients: expandedIssues
-    };
-
-    if (onPost) {
-      onPost(post);
-    }
-
-    // Reset form
-    setTitle("");
-    setDescription("");
-    setHashtags("");
-    setCategory("");
-    setMediaFiles([]);
-    setSharePublicly(false);
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -210,32 +273,62 @@ function CreatePostModal({ isOpen, onClose, onPost, originalRecipe, convertedRec
             </div>
           )}
 
+          {error && (
+            <div className="form-error-message">
+              {error}
+            </div>
+          )}
+          
+          {!isAuthenticated() && (
+            <div className="form-info-message">
+              <strong>Guest Mode:</strong> You can save recipes locally. <a href="#" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "register" } })); }}>Log in or register</a> to post publicly and sync across devices.
+            </div>
+          )}
+
           <div className="form-group checkbox-group">
             <label htmlFor="share-publicly" className="checkbox-label">
               <input
                 type="checkbox"
                 id="share-publicly"
                 checked={sharePublicly}
-                onChange={(e) => setSharePublicly(e.target.checked)}
+                onChange={(e) => {
+                  if (e.target.checked && !isAuthenticated()) {
+                    // Prompt login if trying to post publicly without auth
+                    setError("Please log in to post recipes publicly");
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "login" } }));
+                    }, 500);
+                    return;
+                  }
+                  setSharePublicly(e.target.checked);
+                }}
                 className="checkbox-input"
+                disabled={!isAuthenticated()}
               />
-              <span>Share publicly to Feed</span>
+              <span>{sharePublicly ? "✅ Post Publicly" : "🔒 Keep Private"}</span>
             </label>
             <p className="checkbox-help-text">
               {sharePublicly 
                 ? "This recipe will be visible to everyone in the community feed"
-                : "This recipe will be saved privately to your profile"}
+                : isAuthenticated()
+                ? "This recipe will be saved privately to your profile"
+                : "This recipe will be saved locally. Log in to post publicly or sync across devices."}
             </p>
+            {!isAuthenticated() && (
+              <p className="checkbox-help-text" style={{ color: "var(--accent-gold)", marginTop: "0.5rem" }}>
+                💡 <a href="#" onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "register" } })); }} style={{ textDecoration: "underline" }}>Create an account</a> to post publicly and sync your recipes
+              </p>
+            )}
           </div>
 
           <div className="form-actions">
             <button type="button" className="cancel-btn" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="submit-btn">
-              <Send className="submit-icon" />
-              {sharePublicly ? "Post to Feed" : "Save Privately"}
-            </button>
+                    <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                      <Send className="submit-icon" />
+                      {isSubmitting ? "Posting..." : sharePublicly ? "Post to Feed" : "Save Privately"}
+                    </button>
           </div>
         </form>
       </div>

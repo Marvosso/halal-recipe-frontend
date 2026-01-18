@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, BookOpen, Heart, Users, Settings, Moon, Sun, Bell, Shield, HelpCircle, LogOut } from "lucide-react";
+import { User, BookOpen, Heart, Users, Settings, Moon, Sun, Bell, Shield, HelpCircle, LogOut, Camera } from "lucide-react";
 import RecipePost from "./RecipePost";
 import { useTheme } from "../contexts/ThemeContext";
 import HelpModal from "./HelpModal";
@@ -8,6 +8,10 @@ import NotificationsModal from "./NotificationsModal";
 import AccountModal from "./AccountModal";
 import EditProfileModal from "./EditProfileModal";
 import HalalPreferencesModal from "./HalalPreferencesModal";
+import { getUserData, isAuthenticated, clearAuth } from "../api/authApi";
+import { getProfile } from "../api/profileApi";
+import { getMyRecipes } from "../api/recipesApi";
+import logger from "../utils/logger";
 import "./UserProfile.css";
 
 function UserProfile() {
@@ -25,7 +29,10 @@ function UserProfile() {
     displayName: "",
     bio: "",
     avatarColor: "#0A9D58",
+    profilePhoto: null,
+    email: "",
   });
+  const [isLoading, setIsLoading] = useState(true);
   
   // Modal states
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -37,32 +44,63 @@ function UserProfile() {
 
   useEffect(() => {
     loadUserData();
-    loadProfile();
+    loadProfileData();
     
     // Listen for profile updates
-    const handleProfileUpdate = (e) => {
-      if (e.detail) {
-        setProfile(e.detail);
-      }
-      loadProfile();
+    const handleProfileUpdate = () => {
+      loadProfileData();
     };
     
     window.addEventListener("profileUpdated", handleProfileUpdate);
     return () => window.removeEventListener("profileUpdated", handleProfileUpdate);
   }, []);
 
-  const loadUserData = () => {
+  const loadUserData = async () => {
     try {
-      // Load user posts
+      if (isAuthenticated()) {
+        // Fetch user's recipes from API
+        try {
+          const recipes = await getMyRecipes();
+          const publicRecipes = recipes.filter(r => r.isPublic === true);
+          setUserPosts(publicRecipes);
+          
+          const likesReceived = publicRecipes.reduce((sum, post) => sum + (post.likes || 0), 0);
+          const recipesConverted = parseInt(localStorage.getItem("userRecipesConverted") || "0");
+          
+          setUserStats({
+            recipesConverted,
+            recipesShared: publicRecipes.length,
+            likesReceived,
+            followers: 0,
+            following: 0,
+          });
+        } catch (apiError) {
+          logger.error("Error loading recipes from API:", apiError);
+          // Fallback to localStorage
+          loadFromLocalStorage();
+        }
+      } else {
+        // Not authenticated - use localStorage
+        loadFromLocalStorage();
+      }
+    } catch (error) {
+      logger.error("Error loading user data:", error);
+      loadFromLocalStorage();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadFromLocalStorage = () => {
+    try {
       const posts = JSON.parse(localStorage.getItem("halalKitchenPosts") || "[]");
-      const userPosts = posts.filter((p) => p.userId === "current_user");
+      const currentUserId = getUserData()?.id || "current_user";
+      const userPosts = posts.filter((p) => p.userId === currentUserId);
       setUserPosts(userPosts);
 
-      // Load saved posts
       const saved = JSON.parse(localStorage.getItem("halalKitchenSavedPosts") || "[]");
       setSavedPosts(saved);
 
-      // Calculate stats
       const recipesConverted = parseInt(localStorage.getItem("userRecipesConverted") || "0");
       const likesReceived = userPosts.reduce((sum, post) => sum + (post.likes || 0), 0);
 
@@ -74,28 +112,92 @@ function UserProfile() {
         following: 0,
       });
     } catch (error) {
-      console.error("Error loading user data:", error);
+      logger.error("Error loading from localStorage:", error);
     }
   };
 
-  const loadProfile = () => {
+  const loadProfileData = async () => {
     try {
-      const saved = localStorage.getItem("userProfile");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setProfile({
-          displayName: parsed.displayName || "",
-          bio: parsed.bio || "",
-          avatarColor: parsed.avatarColor || "#0A9D58",
-        });
+      if (isAuthenticated()) {
+        // Fetch profile from API
+        try {
+          const userProfile = await getProfile();
+          setProfile({
+            displayName: userProfile.displayName || "",
+            bio: userProfile.bio || "",
+            avatarColor: userProfile.avatarColor || "#0A9D58",
+            profilePhoto: userProfile.profilePhoto || null,
+            email: userProfile.email || "",
+          });
+        } catch (apiError) {
+          logger.error("Error loading profile from API:", apiError);
+          // Fallback to localStorage
+          loadProfileFromLocalStorage();
+        }
+      } else {
+        // Not authenticated - use localStorage
+        loadProfileFromLocalStorage();
       }
     } catch (error) {
-      console.error("Error loading profile:", error);
+      logger.error("Error loading profile:", error);
+      loadProfileFromLocalStorage();
+    }
+  };
+
+  const loadProfileFromLocalStorage = () => {
+    try {
+      const userData = getUserData();
+      if (userData) {
+        setProfile({
+          displayName: userData.displayName || "",
+          bio: userData.bio || "",
+          avatarColor: userData.avatarColor || "#0A9D58",
+          profilePhoto: userData.profilePhoto || null,
+          email: userData.email || "",
+        });
+      } else {
+        // Try old localStorage format
+        const saved = localStorage.getItem("userProfile");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setProfile({
+            displayName: parsed.displayName || "",
+            bio: parsed.bio || "",
+            avatarColor: parsed.avatarColor || "#0A9D58",
+            profilePhoto: null,
+            email: "",
+          });
+        }
+      }
+    } catch (error) {
+      logger.error("Error loading profile from localStorage:", error);
     }
   };
 
   const handleLogOut = () => {
-    alert("Log out feature is coming soon! For now, all data is stored locally on your device.");
+    if (isAuthenticated()) {
+      if (confirm("Are you sure you want to log out?")) {
+        clearAuth();
+        setProfile({
+          displayName: "",
+          bio: "",
+          avatarColor: "#0A9D58",
+          profilePhoto: null,
+          email: "",
+        });
+        setUserPosts([]);
+        setUserStats({
+          recipesConverted: 0,
+          recipesShared: 0,
+          likesReceived: 0,
+          followers: 0,
+          following: 0,
+        });
+        window.location.reload();
+      }
+    } else {
+      alert("You are not currently logged in.");
+    }
   };
 
   const handleLike = (postId) => {
@@ -131,23 +233,42 @@ function UserProfile() {
       {/* Profile Header */}
       <div className="profile-header">
         <div className="profile-avatar-large">
-          <div 
-            className="avatar-placeholder-large"
-            style={{ background: `linear-gradient(135deg, ${profile.avatarColor} 0%, var(--accent-gold) 100%)` }}
-          >
-            <User className="avatar-icon" />
-          </div>
+          {profile.profilePhoto ? (
+            <img 
+              src={profile.profilePhoto.startsWith('/') ? `${window.location.origin}${profile.profilePhoto}` : profile.profilePhoto}
+              alt={profile.displayName || "Profile"}
+              className="profile-photo-large"
+            />
+          ) : (
+            <div 
+              className="avatar-placeholder-large"
+              style={{ background: `linear-gradient(135deg, ${profile.avatarColor} 0%, var(--accent-gold) 100%)` }}
+            >
+              <User className="avatar-icon" />
+            </div>
+          )}
         </div>
         <div className="profile-info">
           <h1 className="profile-username">
-            {profile.displayName || "Your Profile"}
+            {profile.displayName || (isAuthenticated() ? "Your Profile" : "Guest User")}
           </h1>
+          {profile.email && (
+            <p className="profile-email">{profile.email}</p>
+          )}
           {profile.bio && (
             <p className="profile-bio">{profile.bio}</p>
           )}
           <button 
             className="edit-profile-btn"
-            onClick={() => setIsEditProfileModalOpen(true)}
+            onClick={() => {
+              if (isAuthenticated()) {
+                setIsEditProfileModalOpen(true);
+              } else {
+                alert("Please log in to edit your profile.");
+                // Trigger auth modal via custom event
+                window.dispatchEvent(new CustomEvent("showAuthModal", { detail: { mode: "login" } }));
+              }
+            }}
             aria-label="Edit profile"
           >
             <Settings className="settings-icon" />
@@ -191,7 +312,7 @@ function UserProfile() {
       {/* Tabs */}
       <div className="profile-tabs">
         <button className="profile-tab active">My Recipes</button>
-        <button className="profile-tab">Saved</button>
+        <button className="profile-tab" disabled title="Coming soon: View your saved recipes">Saved <span style={{opacity: 0.7, fontSize: '0.75rem', marginLeft: '0.25rem'}}>(Coming soon)</span></button>
       </div>
 
       {/* Settings Section */}
@@ -258,7 +379,7 @@ function UserProfile() {
           <button 
             className="settings-item logout"
             onClick={handleLogOut}
-            aria-label="Log out (coming soon)"
+            aria-label="Log out"
           >
             <LogOut className="settings-icon" />
             <span>Log Out</span>

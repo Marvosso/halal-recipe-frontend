@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import RecipePost from "./RecipePost";
+import { getRecipes } from "../api/recipesApi";
+import logger from "../utils/logger";
 import "./SocialFeed.css";
 
 function SocialFeed() {
@@ -9,16 +11,39 @@ function SocialFeed() {
   const observerRef = useRef(null);
   const pageRef = useRef(1);
 
-  // Load posts from localStorage (simulating API)
+  // Load posts from API with localStorage fallback
   useEffect(() => {
     loadPosts();
   }, []);
 
-  const loadPosts = () => {
+  const loadPosts = async () => {
     setLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Try to fetch from API first (public recipes endpoint)
+      try {
+        const axios = await import("../api/axiosConfig").then(m => m.getAxiosInstance());
+        const response = await axios.get("/api/recipes/public");
+        const apiPosts = response.data.recipes || [];
+        
+        if (apiPosts.length > 0) {
+          // Map API format to UI format
+          const formattedPosts = apiPosts.map(post => ({
+            ...post,
+            isPublic: post.isPublic !== undefined ? post.isPublic : post.is_public !== undefined ? post.is_public : true,
+            mediaUrls: post.mediaUrls || (post.media_url ? [post.media_url] : []),
+            createdAt: post.createdAt || post.created_at,
+            confidenceScore: post.confidenceScore || post.confidence_score || 0,
+          }));
+          setPosts(formattedPosts);
+          setLoading(false);
+          return;
+        }
+      } catch (apiError) {
+        logger.error("Error fetching from API, falling back to localStorage:", apiError);
+      }
+
+      // Fallback to localStorage
       try {
         const savedPosts = localStorage.getItem("halalKitchenPosts");
         const allPosts = savedPosts ? JSON.parse(savedPosts) : [];
@@ -30,17 +55,17 @@ function SocialFeed() {
           localStorage.setItem("halalKitchenPosts", JSON.stringify(samplePosts));
         } else {
           // Filter to only show public posts (isPublic === true or undefined for backward compatibility)
-          // For backward compatibility, treat undefined isPublic as public
           const publicPosts = allPosts.filter(post => post.isPublic === true || post.isPublic === undefined);
           setPosts(publicPosts);
         }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error("Error loading posts:", error);
-        setLoading(false);
+      } catch (localError) {
+        logger.error("Error loading from localStorage:", localError);
       }
-    }, 500);
+    } catch (error) {
+      logger.error("Error loading posts:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateSamplePosts = () => {
@@ -129,10 +154,15 @@ function SocialFeed() {
   };
 
   const savePostsToStorage = () => {
+    // Only save to localStorage for offline fallback
+    // API posts are managed by backend
     try {
-      localStorage.setItem("halalKitchenPosts", JSON.stringify(posts));
+      const localPosts = posts.filter(post => !post.id || post.id.startsWith("local_"));
+      if (localPosts.length > 0) {
+        localStorage.setItem("halalKitchenPosts", JSON.stringify(localPosts));
+      }
     } catch (error) {
-      console.error("Error saving posts:", error);
+      logger.error("Error saving posts:", error);
     }
   };
 

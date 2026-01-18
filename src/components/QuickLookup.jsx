@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, X, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { evaluateItem } from "../lib/halalEngine";
 import { FEATURES } from "../lib/featureFlags";
+import { formatIngredientName } from "../lib/ingredientDisplay";
 import SimpleExplanationToggle from "./SimpleExplanationToggle";
 import "./QuickLookup.css";
 
@@ -115,12 +116,12 @@ function QuickLookup({ onConvertClick }) {
       let result;
       
       if (FEATURES.HALAL_KNOWLEDGE_ENGINE) {
-        // Use Halal Knowledge Model for intelligent resolution
+        // Use shared evaluateItem() from halalEngine - same function used everywhere
         const normalizedTerm = searchTerm.toLowerCase().trim().replace(/\s+/g, "_");
         const hkmResult = evaluateItem(normalizedTerm);
         
-        // Use HKM if it found something, otherwise fallback to existing database
-        if (hkmResult.status !== "unknown") {
+        // Use HKM result (including unknown) - evaluateItem is the single source of truth
+        // Unknown ingredients are explicitly marked with "Insufficient data — please verify"
           // Map HKM status to UI status
           let uiStatus;
           switch (hkmResult.status) {
@@ -157,25 +158,41 @@ function QuickLookup({ onConvertClick }) {
           const quranRefs = references.filter(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran"));
           const hadithRefs = references.filter(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim"));
           
-          // Convert HKM result to QuickLookup format with full data
+          // Use inheritanceChain from result if available, otherwise build from trace
+          if (hkmResult.inheritanceChain && hkmResult.inheritanceChain.length > 0) {
+            inheritanceChain = hkmResult.inheritanceChain;
+          }
+          
+          // Convert HKM result to QuickLookup format using shared evaluation result
+          // All fields come from evaluateItem (single source of truth)
+          const confidencePercentage = hkmResult.confidencePercentage !== undefined
+            ? hkmResult.confidencePercentage
+            : Math.round((hkmResult.confidence || 0) * 100);
+          
+          // Use explanation from evaluateItem (single source of truth)
+          const explanation = hkmResult.explanation || hkmResult.eli5 || hkmResult.notes || 
+                             (hkmResult.status === "unknown" ? "Insufficient data — please verify" : "Status determined by Halal Knowledge Model.");
+          
           result = {
             status: uiStatus,
-            explanation: hkmResult.notes || hkmResult.eli5 || "Status determined by Halal Knowledge Model.",
+            explanation: explanation, // From evaluateItem (single source of truth)
             alternatives: hkmResult.alternatives || [],
-            confidence: hkmResult.confidence,
+            confidence: confidencePercentage / 100, // Keep 0-1 for backward compatibility
+            confidencePercentage: confidencePercentage, // From evaluateItem
             trace: hkmResult.trace || [],
-            eli5: hkmResult.eli5 || "",
-            notes: hkmResult.notes || "",
+            eli5: hkmResult.eli5 || hkmResult.explanation || "", // From evaluateItem
+            notes: hkmResult.notes || "", // From evaluateItem
             inheritedFrom: hkmResult.inheritedFrom || null,
-            inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : null,
+            inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : (hkmResult.inheritanceChain || null),
             tags: hkmResult.tags || [],
-            references: references,
+            references: references, // From evaluateItem
             quranRef: quranRefs.length > 0 ? quranRefs[0] : undefined,
             hadithRef: hadithRefs.length > 0 ? hadithRefs.join("; ") : undefined,
+            displayName: hkmResult.displayName, // Normalized display name from evaluateItem
             hkmResult: hkmResult // Keep original for reference
           };
         } else {
-          // Fallback to existing logic if HKM doesn't have the item
+          // Fallback to existing logic only if feature flag is off
           result = existingLookupLogic(searchTerm);
         }
       } else {
@@ -333,8 +350,18 @@ function QuickLookup({ onConvertClick }) {
             {result.confidence !== undefined && (
               <div className="confidence-section">
                 <p className="confidence-score">
-                  <strong>Confidence:</strong> {Math.round(result.confidence * 100)}%
+                  <strong>Confidence:</strong> {result.confidencePercentage !== undefined ? result.confidencePercentage : Math.round(result.confidence * 100)}%
                 </p>
+                {result.confidence_type === "classification" && (
+                  <p className="confidence-type-note">
+                    (classification only, no substitutions applied)
+                  </p>
+                )}
+                {result.inheritanceChain && result.inheritanceChain.length > 0 && (
+                  <p className="confidence-breakdown">
+                    <small>Confidence reduced due to: {result.inheritanceChain.map(id => formatIngredientName(id)).join(", ")}</small>
+                  </p>
+                )}
               </div>
             )}
             
