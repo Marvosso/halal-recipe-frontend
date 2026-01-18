@@ -122,75 +122,75 @@ function QuickLookup({ onConvertClick }) {
         
         // Use HKM result (including unknown) - evaluateItem is the single source of truth
         // Unknown ingredients are explicitly marked with "Insufficient data — please verify"
-          // Map HKM status to UI status
-          let uiStatus;
-          switch (hkmResult.status) {
-            case "halal":
-              uiStatus = "halal";
-              break;
-            case "haram":
-              uiStatus = "haram";
-              break;
-            case "conditional":
-              uiStatus = "questionable";
-              break;
-            default:
-              uiStatus = "unknown";
+        // Map HKM status to UI status
+        let uiStatus;
+        switch (hkmResult.status) {
+          case "halal":
+            uiStatus = "halal";
+            break;
+          case "haram":
+            uiStatus = "haram";
+            break;
+          case "conditional":
+            uiStatus = "questionable";
+            break;
+          default:
+            uiStatus = "unknown";
+        }
+        
+        // Build inheritance chain display
+        let inheritanceChain = [];
+        if (hkmResult.inheritedFrom) {
+          // Build chain from trace
+          if (hkmResult.trace && hkmResult.trace.length > 1) {
+            inheritanceChain = hkmResult.trace.map(t => {
+              // Extract ingredient name from trace (e.g., "gelatin is conditional" -> "gelatin")
+              const match = t.match(/^(\w+)/);
+              return match ? match[1] : t;
+            });
+          } else {
+            inheritanceChain = [normalizedTerm, hkmResult.inheritedFrom];
           }
-          
-          // Build inheritance chain display
-          let inheritanceChain = [];
-          if (hkmResult.inheritedFrom) {
-            // Build chain from trace
-            if (hkmResult.trace && hkmResult.trace.length > 1) {
-              inheritanceChain = hkmResult.trace.map(t => {
-                // Extract ingredient name from trace (e.g., "gelatin is conditional" -> "gelatin")
-                const match = t.match(/^(\w+)/);
-                return match ? match[1] : t;
-              });
-            } else {
-              inheritanceChain = [normalizedTerm, hkmResult.inheritedFrom];
-            }
-          }
-          
-          // Extract references from JSON engine
-          const references = hkmResult.references || [];
-          const quranRefs = references.filter(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran"));
-          const hadithRefs = references.filter(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim"));
-          
-          // Use inheritanceChain from result if available, otherwise build from trace
-          if (hkmResult.inheritanceChain && hkmResult.inheritanceChain.length > 0) {
-            inheritanceChain = hkmResult.inheritanceChain;
-          }
-          
-          // Convert HKM result to QuickLookup format using shared evaluation result
-          // All fields come from evaluateItem (single source of truth)
-          const confidencePercentage = hkmResult.confidencePercentage !== undefined
-            ? hkmResult.confidencePercentage
-            : Math.round((hkmResult.confidence || 0) * 100);
-          
-          // Use explanation from evaluateItem (single source of truth)
-          const explanation = hkmResult.explanation || hkmResult.eli5 || hkmResult.notes || 
-                             (hkmResult.status === "unknown" ? "Insufficient data — please verify" : "Status determined by Halal Knowledge Model.");
-          
-          result = {
-            status: uiStatus,
-            explanation: explanation, // From evaluateItem (single source of truth)
-            alternatives: hkmResult.alternatives || [],
-            confidence: confidencePercentage / 100, // Keep 0-1 for backward compatibility
-            confidencePercentage: confidencePercentage, // From evaluateItem
-            trace: hkmResult.trace || [],
-            eli5: hkmResult.eli5 || hkmResult.explanation || "", // From evaluateItem
-            notes: hkmResult.notes || "", // From evaluateItem
-            inheritedFrom: hkmResult.inheritedFrom || null,
-            inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : (hkmResult.inheritanceChain || null),
-            tags: hkmResult.tags || [],
-            references: references, // From evaluateItem
-            quranRef: quranRefs.length > 0 ? quranRefs[0] : undefined,
-            hadithRef: hadithRefs.length > 0 ? hadithRefs.join("; ") : undefined,
-            displayName: hkmResult.displayName, // Normalized display name from evaluateItem
-            hkmResult: hkmResult // Keep original for reference
-          };
+        }
+        
+        // Extract references from JSON engine
+        const references = hkmResult.references || [];
+        const quranRefs = references.filter(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran"));
+        const hadithRefs = references.filter(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim"));
+        
+        // Use inheritanceChain from result if available, otherwise build from trace
+        if (hkmResult.inheritanceChain && hkmResult.inheritanceChain.length > 0) {
+          inheritanceChain = hkmResult.inheritanceChain;
+        }
+        
+        // Convert HKM result to QuickLookup format using shared evaluation result
+        // All fields come from evaluateItem (single source of truth)
+        const confidencePercentage = hkmResult.confidencePercentage !== undefined
+          ? hkmResult.confidencePercentage
+          : Math.round((hkmResult.confidence || 0) * 100);
+        
+        // Use explanation from evaluateItem (single source of truth)
+        const explanation = hkmResult.explanation || hkmResult.eli5 || hkmResult.notes || 
+                           (hkmResult.status === "unknown" ? "Insufficient data — please verify" : "Status determined by Halal Knowledge Model.");
+        
+        result = {
+          status: uiStatus,
+          explanation: explanation, // From evaluateItem (single source of truth)
+          alternatives: hkmResult.alternatives || [],
+          confidence: confidencePercentage / 100, // Keep 0-1 for backward compatibility
+          confidencePercentage: confidencePercentage, // From evaluateItem
+          trace: hkmResult.trace || [],
+          eli5: hkmResult.eli5 || hkmResult.explanation || "", // From evaluateItem
+          notes: hkmResult.notes || "", // From evaluateItem
+          inheritedFrom: hkmResult.inheritedFrom || null,
+          inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : (hkmResult.inheritanceChain || null),
+          tags: hkmResult.tags || [],
+          references: references, // From evaluateItem
+          quranRef: quranRefs.length > 0 ? quranRefs[0] : undefined,
+          hadithRef: hadithRefs.length > 0 ? hadithRefs.join("; ") : undefined,
+          displayName: hkmResult.displayName, // Normalized display name from evaluateItem
+          hkmResult: hkmResult // Keep original for reference
+        };
       } else {
         // Use existing lookup logic when feature flag is off
         result = existingLookupLogic(searchTerm);
