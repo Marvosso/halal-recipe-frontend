@@ -46,7 +46,25 @@ function AuthModal({ isOpen, onClose, initialMode = "login" }) {
         window.location.reload();
       }, 1500);
     } catch (err) {
-      setError(err.error || "An error occurred. Please try again.");
+      // Handle different error structures
+      let errorMessage = "An error occurred. Please try again.";
+      if (err?.error) {
+        errorMessage = err.error;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (typeof err === "string") {
+        errorMessage = err;
+      } else if (err?.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err?.response?.status === 400) {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (err?.response?.status === 409) {
+        errorMessage = "An account with this email already exists.";
+      } else if (err?.code === "ECONNREFUSED" || err?.message?.includes("Network Error")) {
+        errorMessage = "Unable to connect to server. Please check your internet connection.";
+      }
+      setError(errorMessage);
+      console.error("Auth error:", err);
     } finally {
       setIsLoading(false);
     }

@@ -22,6 +22,11 @@ function normalizeIngredientName(name) {
 function detectIngredientsInText(recipeText, userPreferences = {}) {
   if (!recipeText || typeof recipeText !== "string") return [];
   
+  if (!halalKnowledge || typeof halalKnowledge !== "object" || Object.keys(halalKnowledge).length === 0) {
+    console.warn("halalKnowledge not loaded or empty");
+    return [];
+  }
+  
   const textLower = recipeText.toLowerCase();
   const detected = [];
   const processed = new Set(); // Track processed ingredients to avoid duplicates
