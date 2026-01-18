@@ -191,12 +191,8 @@ function QuickLookup({ onConvertClick }) {
             displayName: hkmResult.displayName, // Normalized display name from evaluateItem
             hkmResult: hkmResult // Keep original for reference
           };
-        } else {
-          // Fallback to existing logic only if feature flag is off
-          result = existingLookupLogic(searchTerm);
-        }
       } else {
-        // Use existing lookup logic
+        // Use existing lookup logic when feature flag is off
         result = existingLookupLogic(searchTerm);
       }
       
