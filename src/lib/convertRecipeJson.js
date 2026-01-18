@@ -6,6 +6,7 @@
 import { evaluateItem, calculateConfidenceScore } from "./halalEngine";
 import { FEATURES } from "./featureFlags";
 import halalKnowledge from "../data/halal_knowledge.json";
+import { formatIngredientName } from "./ingredientDisplay";
 
 /**
  * Normalize ingredient name for lookup
@@ -86,6 +87,7 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
               ingredient_id: normalizedKey, // Internal ID (snake_case)
               ingredient: normalizedKey, // Keep for backward compatibility
               normalizedName: normalizedKey,
+              matchedTerm: term, // Store the actual term that matched in the recipe text
               status: engineResult.status,
               replacement_id: replacementId, // Replacement ingredient ID
               replacement: replacementId, // Keep for backward compatibility (will be formatted in UI)
@@ -117,9 +119,6 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
   if (!recipeText || typeof recipeText !== "string" || detectedIngredients.length === 0) {
     return recipeText;
   }
-  
-  // Import display formatter (use require to avoid circular dependency issues)
-  const { formatIngredientName } = require("./ingredientDisplay");
   
   let convertedText = recipeText;
   
