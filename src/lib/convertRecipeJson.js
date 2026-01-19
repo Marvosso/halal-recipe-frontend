@@ -137,10 +137,13 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
     const ingredientId = item.ingredient_id || item.ingredient;
     const replacementId = item.replacement_id || item.replacement;
     
+    // Skip if no replacement available
+    if (!replacementId || replacementId === "Halal alternative needed" || replacementId.trim() === "") {
+      return; // Skip this ingredient if no replacement
+    }
+    
     // Get formatted replacement name from display map
-    const replacementDisplay = replacementId && replacementId !== "Halal alternative needed"
-      ? formatIngredientName(replacementId)
-      : "Halal alternative";
+    const replacementDisplay = formatIngredientName(replacementId);
     
     // Create search patterns for the original ingredient (handle various formats)
     // Start with the actual term that was matched during detection
@@ -162,14 +165,17 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
       });
     }
     
-    // Remove duplicates
-    const uniquePatterns = [...new Set(searchPatterns)];
+    // Remove duplicates and empty patterns
+    const uniquePatterns = [...new Set(searchPatterns)].filter(p => p && p.trim() !== "");
     
     // Replace each pattern found in text
     uniquePatterns.forEach(pattern => {
       const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Use word boundary regex, but be flexible with punctuation (comma, period, etc.)
       const regex = new RegExp(`\\b${escapedPattern}\\b`, "gi");
       
+      // Replace all occurrences
+      let previousText = convertedText;
       convertedText = convertedText.replace(regex, (match) => {
         // Preserve original case
         if (match === match.toUpperCase()) {
@@ -179,6 +185,11 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
         }
         return replacementDisplay;
       });
+      
+      // Debug: log if replacement occurred
+      if (convertedText !== previousText) {
+        console.log(`Replaced "${pattern}" with "${replacementDisplay}"`);
+      }
     });
   });
   
