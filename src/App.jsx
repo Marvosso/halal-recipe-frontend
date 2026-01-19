@@ -1274,13 +1274,23 @@ Instructions:
                                       </div>
                                     )}
                                     
-                                    {/* ELI5 from Knowledge Model */}
-                                    {issue?.eli5 && (
+                                    {/* ELI5 from Knowledge Model - Show based on toggle */}
+                                    {issue?.eli5 && simpleExplanationEnabled ? (
                                       <div className="ingredient-detail-row">
                                         <span className="detail-label">Simple Explanation:</span>
                                         <span className="detail-value eli5-value">{issue.eli5}</span>
                                       </div>
-                                    )}
+                                    ) : issue?.notes && !simpleExplanationEnabled ? (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Explanation:</span>
+                                        <span className="detail-value">{issue.notes}</span>
+                                      </div>
+                                    ) : issue?.explanation && !simpleExplanationEnabled ? (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Explanation:</span>
+                                        <span className="detail-value">{issue.explanation}</span>
+                                      </div>
+                                    ) : null}
                                     
                                     {/* Derived Ingredient Warning */}
                                     {issue?.trace && Array.isArray(issue.trace) && issue.trace.length > 1 && (

@@ -220,8 +220,28 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
   }
   
   // Use shared calculateConfidenceScore from halalEngine
+  // If substitutions exist, start with higher base confidence (replacements improve confidence)
+  let effectiveBaseConfidence = maxBaseConfidence;
+  if (hasSubstitutions) {
+    // When replacements exist, boost base confidence (replacements are positive)
+    // Start from a higher base (e.g., 0.8 instead of 0.0 for haram items)
+    effectiveBaseConfidence = Math.max(maxBaseConfidence, 0.8);
+    
+    // Count how many items have replacements
+    const withReplacement = detectedIngredients.filter(
+      (item) => item.replacement_id && item.replacement_id.trim() !== "" && item.replacement_id !== "Halal alternative needed"
+    ).length;
+    
+    // Boost confidence based on replacement ratio
+    if (withReplacement > 0) {
+      const replacementRatio = withReplacement / detectedIngredients.length;
+      // Scale from 0.8 to 0.95 based on replacement ratio
+      effectiveBaseConfidence = 0.8 + (replacementRatio * 0.15);
+    }
+  }
+  
   let baseScore = calculateConfidenceScore(
-    maxBaseConfidence,
+    effectiveBaseConfidence,
     aggregatedImpact,
     strictness,
     hasAnyInheritance

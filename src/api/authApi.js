@@ -1,4 +1,5 @@
 import { getAxiosInstance } from "./axiosConfig";
+import { getAPIBaseURL } from "../utils/apiConfig";
 import logger from "../utils/logger";
 
 /**
@@ -77,7 +78,36 @@ export async function register(email, password, displayName) {
     return response.data;
   } catch (error) {
     logger.error("Registration error:", error);
-    throw error.response?.data || { error: "Registration failed" };
+    
+    // Handle HTML error responses (e.g., 404 from Express)
+    if (error.response?.data && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE')) {
+      const baseURL = await getAPIBaseURL();
+      throw { 
+        error: `Backend server not responding correctly. Please ensure the backend is running at ${baseURL}. If you're in production, check that the backend is deployed.` 
+      };
+    }
+    
+    // Handle JSON error responses
+    if (error.response?.data?.error) {
+      throw { error: error.response.data.error };
+    }
+    
+    // Handle network errors
+    if (error.code === "ECONNREFUSED" || error.message?.includes("Network Error")) {
+      throw { error: "Unable to connect to server. Please check your internet connection and ensure the backend is running." };
+    }
+    
+    // Handle HTTP status errors
+    if (error.response?.status === 400) {
+      throw { error: error.response.data?.error || "Invalid request. Please check your input." };
+    }
+    
+    if (error.response?.status === 409) {
+      throw { error: "An account with this email already exists." };
+    }
+    
+    // Generic fallback
+    throw { error: error.message || "Registration failed. Please try again." };
   }
 }
 
