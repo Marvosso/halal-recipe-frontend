@@ -1,9 +1,14 @@
 /**
  * Frontend Recipe Conversion Engine using JSON Knowledge Base
  * Uses shared evaluateItem() from halalEngine.js for consistent evaluation
+ * 
+ * IMPORTANT: Ingredient replacement and confidence scoring are STRICTLY SEPARATED
+ * - Conversion always runs fully, regardless of confidence score
+ * - Confidence score is calculated AFTER all replacements are complete
+ * - Replacement logic never skips items due to scoring concerns
  */
 
-import { evaluateItem, calculateConfidenceScore } from "./halalEngine";
+import { evaluateItem } from "./halalEngine";
 import { FEATURES } from "./featureFlags";
 import halalKnowledge from "../data/halal_knowledge.json";
 import { formatIngredientName } from "./ingredientDisplay";
@@ -19,6 +24,8 @@ function normalizeIngredientName(name) {
 /**
  * Detect haram/conditional ingredients in recipe text using JSON knowledge base
  * Improved detection with word boundaries and alias matching
+ * 
+ * SEPARATION OF CONCERNS: This function only detects ingredients, does NOT replace them
  */
 function detectIngredientsInText(recipeText, userPreferences = {}) {
   if (!recipeText || typeof recipeText !== "string") return [];
@@ -83,15 +90,6 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
             // Get replacement ingredient ID (first alternative)
             const replacementId = entry?.alternatives?.[0] || engineResult.alternatives?.[0] || null;
             
-            // Ensure confidenceScore is passed through correctly
-            const confidenceScore = engineResult.confidenceScore !== undefined 
-              ? engineResult.confidenceScore 
-              : (engineResult.confidencePercentage !== undefined 
-                  ? engineResult.confidencePercentage 
-                  : (engineResult.confidence !== undefined 
-                      ? Math.round(engineResult.confidence * 100) 
-                      : 50)); // Default to 50 if truly missing, not 0
-            
             detected.push({
               ingredient_id: normalizedKey, // Internal ID (snake_case)
               ingredient: normalizedKey, // Keep for backward compatibility
@@ -104,8 +102,6 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
               notes: engineResult.notes || entry?.notes || "",
               severity: entry?.confidence_score_base === 0.1 ? "high" : 
                        entry?.confidence_score_base === 0.5 ? "medium" : "low",
-              confidence: confidenceScore / 100, // 0-1 format for backward compatibility
-              confidenceScore: confidenceScore, // PRIMARY: 0-100 format
               quranReference: engineResult.references?.find(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran")) || "",
               hadithReference: engineResult.references?.find(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim")) || "",
               engineResult: engineResult,
@@ -122,27 +118,55 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
 }
 
 /**
- * Replace haram ingredients in recipe text with halal alternatives
- * Uses ingredient IDs and display mapping for replacements
+ * PURE FUNCTION: Convert ingredients in recipe text
+ * 
+ * SEPARATION OF CONCERNS: This function ONLY does replacement, never calculates confidence
+ * Returns what was replaced and what couldn't be replaced for scoring later
+ * 
+ * @param {string} recipeText - Original recipe text
+ * @param {Array} detectedIngredients - Array of detected haram/conditional ingredients
+ * @returns {Object} { convertedText, replacements, unresolved }
+ *   - convertedText: Recipe text with replacements applied
+ *   - replacements: Array of { original, replacement, status } for successfully replaced items
+ *   - unresolved: Array of { ingredient, status } for items without replacements
  */
-function replaceIngredientsInText(recipeText, detectedIngredients) {
+function convertIngredients(recipeText, detectedIngredients) {
+  // Defensive checks: if no ingredients detected, return original text
   if (!recipeText || typeof recipeText !== "string" || detectedIngredients.length === 0) {
-    return recipeText;
+    return {
+      convertedText: recipeText || "",
+      replacements: [],
+      unresolved: []
+    };
   }
   
   let convertedText = recipeText;
+  const replacements = []; // Track successfully replaced ingredients
+  const unresolved = []; // Track ingredients without replacements
   
+  // Process each detected ingredient
   detectedIngredients.forEach(item => {
     // Get ingredient ID (internal snake_case format)
     const ingredientId = item.ingredient_id || item.ingredient;
     const replacementId = item.replacement_id || item.replacement;
+    const status = item.status || item.engineResult?.status || "unknown";
     
-    // Skip if no replacement available
-    if (!replacementId || replacementId === "Halal alternative needed" || replacementId.trim() === "") {
-      return; // Skip this ingredient if no replacement
+    // Check if replacement is available
+    const hasReplacement = replacementId && 
+                          replacementId !== "Halal alternative needed" && 
+                          replacementId.trim() !== "";
+    
+    if (!hasReplacement) {
+      // No replacement available - mark as unresolved
+      unresolved.push({
+        ingredient: ingredientId,
+        status: status,
+        matchedTerm: item.matchedTerm || ingredientId
+      });
+      return; // Skip to next ingredient
     }
     
-    // Get formatted replacement name from display map
+    // Replacement available - perform replacement
     const replacementDisplay = formatIngredientName(replacementId);
     
     // Create search patterns for the original ingredient (handle various formats)
@@ -168,6 +192,9 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
     // Remove duplicates and empty patterns
     const uniquePatterns = [...new Set(searchPatterns)].filter(p => p && p.trim() !== "");
     
+    // Track if any replacement occurred for this ingredient
+    let wasReplaced = false;
+    
     // Replace each pattern found in text
     uniquePatterns.forEach(pattern => {
       const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -175,8 +202,9 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
       const regex = new RegExp(`\\b${escapedPattern}\\b`, "gi");
       
       // Replace all occurrences
-      let previousText = convertedText;
+      const previousText = convertedText;
       convertedText = convertedText.replace(regex, (match) => {
+        wasReplaced = true;
         // Preserve original case
         if (match === match.toUpperCase()) {
           return replacementDisplay.toUpperCase();
@@ -191,188 +219,90 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
         console.log(`Replaced "${pattern}" with "${replacementDisplay}"`);
       }
     });
+    
+    // Track successful replacement
+    if (wasReplaced) {
+      replacements.push({
+        original: ingredientId,
+        replacement: replacementId,
+        status: status,
+        matchedTerm: item.matchedTerm || ingredientId
+      });
+    } else {
+      // Pattern matched but replacement didn't occur (shouldn't happen, but handle gracefully)
+      unresolved.push({
+        ingredient: ingredientId,
+        status: status,
+        matchedTerm: item.matchedTerm || ingredientId
+      });
+    }
   });
   
-  return convertedText;
-}
-
-/**
- * Calculate confidence score based on detected ingredients and user preferences
- * Uses SHARED calculateConfidenceScore from halalEngine.js for consistency
- * Applies recipe-level penalties (missing replacements) on top of per-ingredient scores
- */
-function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {}, hasSubstitutions = false) {
-  // Guard: If no ingredients evaluated, return null (not 0%)
-  if (!detectedIngredients || detectedIngredients.length === 0) {
-    return { score: null, confidence_type: hasSubstitutions ? "post_conversion" : "classification" };
-  }
-  
-  const strictness = userPreferences.strictnessLevel || "standard";
-  
-  // Count ingredient outcomes
-  let halalCount = 0;
-  let haramCount = 0;
-  let conditionalCount = 0;
-  let unknownCount = 0;
-  let totalEvaluated = detectedIngredients.length;
-  
-  // Use shared confidence scoring from halalEngine for each ingredient
-  // Aggregate all ingredient confidence impacts and track statuses
-  let aggregatedImpact = 0;
-  let minBaseConfidence = 1.0; // Track worst case (lowest confidence)
-  let hasAnyInheritance = false;
-  
-  for (const item of detectedIngredients) {
-    const engineResult = item.engineResult || {};
-    const impact = engineResult.confidenceImpact || item.confidenceImpact || 0;
-    
-    // Track ingredient status for counting
-    const itemStatus = engineResult.status || item.status || "unknown";
-    if (itemStatus === "halal") {
-      halalCount++;
-    } else if (itemStatus === "haram") {
-      haramCount++;
-    } else if (itemStatus === "conditional") {
-      conditionalCount++;
-    } else {
-      unknownCount++;
-    }
-    
-    // Track most severe status (lowest base confidence)
-    const itemBaseConfidence = itemStatus === "haram" ? 0.0 :
-                               itemStatus === "conditional" ? 0.6 :
-                               itemStatus === "questionable" ? 0.5 :
-                               itemStatus === "unknown" ? 0.4 : 1.0;
-    
-    if (itemBaseConfidence < minBaseConfidence) {
-      minBaseConfidence = itemBaseConfidence;
-    }
-    
-    // Aggregate confidence impacts
-    if (impact < 0) {
-      aggregatedImpact += impact;
-    }
-    
-    // Track inheritance
-    if (engineResult.inheritedFrom || item.inheritedFrom) {
-      hasAnyInheritance = true;
-    }
-  }
-  
-  // Calculate base confidence based on ingredient outcomes
-  // Weighted average: more haram/unknown = lower confidence
-  const haramWeight = haramCount / totalEvaluated;
-  const unknownWeight = unknownCount / totalEvaluated;
-  const conditionalWeight = conditionalCount / totalEvaluated;
-  const halalWeight = halalCount / totalEvaluated;
-  
-  // Base confidence: start from worst case, but improve based on halal ratio
-  let effectiveBaseConfidence = minBaseConfidence;
-  
-  // Count replacements
-  const withReplacement = detectedIngredients.filter(
-    (item) => item.replacement_id && item.replacement_id.trim() !== "" && item.replacement_id !== "Halal alternative needed"
-  ).length;
-  const withoutReplacement = detectedIngredients.length - withReplacement;
-  const replacementRatio = withReplacement / totalEvaluated;
-  
-  // If substitutions exist, boost confidence (replacements are positive)
-  if (hasSubstitutions) {
-    if (withReplacement > 0) {
-      // When replacements exist, the negative impact is reduced/eliminated
-      // Reduce aggregatedImpact proportionally to replacement ratio
-      // If all items are replaced, eliminate the negative impact entirely
-      const adjustedImpact = aggregatedImpact * (1 - replacementRatio);
-      
-      // Boost base confidence: if all haram items are replaced, confidence should be high
-      // Scale from minBaseConfidence to 0.95 based on replacement ratio
-      // When replacementRatio = 1.0 (all replaced), baseConfidence should be 0.95
-      // When replacementRatio = 0.0 (none replaced), baseConfidence = minBaseConfidence
-      effectiveBaseConfidence = minBaseConfidence + (replacementRatio * (0.95 - minBaseConfidence));
-      
-      // Calculate base score using adjusted impact (reduced negative impact for replaced items)
-      baseScore = calculateConfidenceScore(
-        effectiveBaseConfidence,
-        adjustedImpact, // Use adjusted impact (reduced for replaced items)
-        strictness,
-        hasAnyInheritance
-      );
-      
-      // Apply penalties for missing replacements
-      if (withoutReplacement > 0) {
-        // Missing replacement reduces confidence by 20% per missing item
-        baseScore *= Math.pow(0.8, withoutReplacement);
-      }
-      
-      // Boost for successful full replacement (all items replaced)
-      if (replacementRatio === 1.0) {
-        // All items successfully replaced - high confidence
-        baseScore = Math.min(100, baseScore * 1.05); // Slight boost to reach 95-100%
-      }
-    } else {
-      // No replacements but substitutions exist (shouldn't happen, but handle gracefully)
-      effectiveBaseConfidence = Math.max(minBaseConfidence, 0.5);
-      baseScore = calculateConfidenceScore(
-        effectiveBaseConfidence,
-        aggregatedImpact,
-        strictness,
-        hasAnyInheritance
-      );
-    }
-  } else {
-    // No substitutions: use weighted average based on ingredient statuses
-    // Halal ingredients boost confidence, haram/unknown reduce it
-    effectiveBaseConfidence = (halalWeight * 1.0) + 
-                              (conditionalWeight * 0.6) + 
-                              (unknownWeight * 0.4) + 
-                              (haramWeight * 0.0);
-    
-    // Calculate base score using shared function
-    baseScore = calculateConfidenceScore(
-      effectiveBaseConfidence,
-      aggregatedImpact,
-      strictness,
-      hasAnyInheritance
-    );
-  }
-  
-  // Additional inheritance penalty for recipes with multiple inherited ingredients
-  const withInheritance = detectedIngredients.filter(
-    (item) => item.engineResult?.inheritedFrom || item.inheritedFrom
-  ).length;
-  
-  if (withInheritance > 1) {
-    // Extra 5% penalty for multiple inheritance chains
-    baseScore *= 0.95;
-  }
-  
-  // Ensure score reflects successful replacements
-  // If all ingredients are replaced, confidence should be high (80-100%)
-  if (hasSubstitutions && replacementRatio === 1.0 && baseScore < 80) {
-    // All items successfully replaced - ensure high confidence
-    baseScore = Math.max(80, baseScore);
-  }
-  
-  // Guard: Never return 0% unless truly 0 (all haram, no replacements)
-  // If we have evaluated ingredients with replacements or halal items, minimum score should reflect that
-  if (baseScore === 0 && totalEvaluated > 0) {
-    if (halalCount > 0 || conditionalCount > 0) {
-      // Has halal/conditional ingredients - score shouldn't be 0
-      baseScore = Math.max(10, baseScore);
-    } else if (hasSubstitutions && withReplacement > 0) {
-      // Has substitutions with replacements - score shouldn't be 0
-      baseScore = Math.max(20, baseScore);
-    }
-  }
-  
   return {
-    score: Math.max(0, Math.min(100, Math.round(baseScore))),
-    confidence_type: hasSubstitutions ? "post_conversion" : "classification"
+    convertedText,
+    replacements,
+    unresolved
   };
 }
 
 /**
+ * PURE FUNCTION: Calculate confidence score based on FINAL conversion state
+ * 
+ * SEPARATION OF CONCERNS: This function ONLY calculates confidence, never performs replacement
+ * Confidence reflects the FINAL state after all replacements are complete
+ * 
+ * Rules:
+ * - Start at 100
+ * - -20 for each unresolved haram ingredient
+ * - -10 for questionable/conditional ingredients without replacement
+ * - 0 penalty if haram ingredient was successfully replaced (never penalize if replacement exists)
+ * 
+ * @param {Object} conversionResult - Result from convertIngredients()
+ *   - originalIngredients: Array of detected ingredients
+ *   - replacements: Array of successfully replaced ingredients
+ *   - unresolved: Array of ingredients without replacements
+ * @returns {number} Confidence score 0-100 (100 = perfect, all haram ingredients replaced)
+ */
+function calculateConfidenceScore({ originalIngredients, replacements, unresolved }) {
+  // Start at 100% confidence
+  let score = 100;
+  
+  // Count resolved vs unresolved ingredients by status
+  const unresolvedHaram = unresolved.filter(item => item.status === "haram").length;
+  const unresolvedQuestionable = unresolved.filter(item => 
+    item.status === "questionable" || item.status === "conditional"
+  ).length;
+  
+  // Apply penalties based on final state (AFTER replacements)
+  // -20 points per unresolved haram ingredient
+  score -= (unresolvedHaram * 20);
+  
+  // -10 points per unresolved questionable/conditional ingredient
+  score -= (unresolvedQuestionable * 10);
+  
+  // Ensure score is within valid range (0-100)
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  
+  // Special case: If all haram ingredients were successfully replaced, score should be 100%
+  // This ensures demo recipe with full replacements shows 100%
+  const totalHaram = originalIngredients.filter(item => 
+    item.status === "haram" || item.engineResult?.status === "haram"
+  ).length;
+  const replacedHaram = replacements.filter(item => item.status === "haram").length;
+  
+  if (totalHaram > 0 && replacedHaram === totalHaram && unresolvedHaram === 0) {
+    // All haram ingredients were successfully replaced
+    score = 100;
+  }
+  
+  return score;
+}
+
+/**
  * Main conversion function using JSON knowledge engine
+ * 
+ * PIPELINE: Detect → Convert → Calculate Score
+ * Each step is independent and runs fully regardless of previous step results
  */
 export function convertRecipeWithJson(recipeText, userPreferences = {}) {
   // Defensive checks
@@ -396,46 +326,57 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
   }
   
   try {
-    // Step 1: Detect haram/conditional ingredients using JSON knowledge base
+    // STEP 1: DETECT ingredients (pure detection, no replacement, no scoring)
     const detectedIngredients = detectIngredientsInText(trimmedText, userPreferences);
     
     // Debug: log detected ingredients
     console.log("[CONVERSION DEBUG] Detected ingredients:", detectedIngredients.map(i => ({
       ingredient: i.ingredient_id || i.ingredient,
       replacement: i.replacement_id || i.replacement,
-      matchedTerm: i.matchedTerm
+      matchedTerm: i.matchedTerm,
+      status: i.status
     })));
     
-    // Step 2: Replace ingredients in text
-    const convertedText = replaceIngredientsInText(trimmedText, detectedIngredients);
+    // STEP 2: CONVERT ingredients (pure replacement, no scoring logic)
+    // Conversion ALWAYS runs fully, regardless of what will happen in scoring
+    const conversionResult = convertIngredients(trimmedText, detectedIngredients);
+    const { convertedText, replacements, unresolved } = conversionResult;
+    
+    // Debug: log conversion results
+    console.log("[CONVERSION DEBUG] Replacements:", replacements.length);
+    console.log("[CONVERSION DEBUG] Unresolved:", unresolved.length);
+    
+    // STEP 3: CALCULATE confidence score (pure scoring, uses FINAL conversion state)
+    // Scoring happens AFTER all replacements are complete
+    const confidenceScore = calculateConfidenceScore({
+      originalIngredients: detectedIngredients,
+      replacements: replacements,
+      unresolved: unresolved
+    });
+    
+    // Check if any substitutions occurred (for confidence_type classification)
     const hasSubstitutions = convertedText !== trimmedText;
     
-    // Debug: log if substitutions occurred
-    if (!hasSubstitutions && detectedIngredients.length > 0) {
-      console.warn("[CONVERSION DEBUG] Ingredients detected but no substitutions occurred");
-    }
-    
-    // Step 3: Calculate confidence score with type (uses shared scoring from halalEngine)
-    const confidenceResult = calculateRecipeConfidenceScore(detectedIngredients, userPreferences, hasSubstitutions);
-    const confidenceScore = confidenceResult.score;
-    const confidenceType = confidenceResult.confidence_type;
-    
-    // Step 4: Format issues for UI (using ingredient IDs)
+    // STEP 4: Format issues for UI (using ingredient IDs)
+    // Include both replaced and unresolved ingredients in issues list
     const issues = detectedIngredients.map((item) => {
       const references = [];
       if (item.quranReference) references.push(item.quranReference);
       if (item.hadithReference) references.push(item.hadithReference);
       
+      // Check if this ingredient was successfully replaced
+      const wasReplaced = replacements.some(r => 
+        r.original === (item.ingredient_id || item.ingredient)
+      );
+      
       // Ensure confidenceScore is passed through
-      const issueConfidenceScore = item.confidenceScore !== undefined
-        ? item.confidenceScore
-        : (item.engineResult?.confidenceScore !== undefined
-            ? item.engineResult.confidenceScore
-            : (item.engineResult?.confidencePercentage !== undefined
-                ? item.engineResult.confidencePercentage
-                : (item.engineResult?.confidence !== undefined
-                    ? Math.round(item.engineResult.confidence * 100)
-                    : undefined)));
+      const issueConfidenceScore = item.engineResult?.confidenceScore !== undefined
+        ? item.engineResult.confidenceScore
+        : (item.engineResult?.confidencePercentage !== undefined
+            ? item.engineResult.confidencePercentage
+            : (item.engineResult?.confidence !== undefined
+                ? Math.round(item.engineResult.confidence * 100)
+                : undefined));
       
       return {
         ingredient_id: item.ingredient_id || item.ingredient, // Internal ID
@@ -444,7 +385,7 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
         replacement: item.replacement_id || item.replacement, // Keep for backward compatibility
         notes: item.notes,
         severity: item.severity,
-        confidence: item.confidence,
+        confidence: issueConfidenceScore ? issueConfidenceScore / 100 : undefined, // 0-1 format for backward compatibility
         confidenceScore: issueConfidenceScore, // PRIMARY: 0-100 format
         quranReference: item.quranReference,
         hadithReference: item.hadithReference,
@@ -460,31 +401,27 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
         hkmResult: item.engineResult,
         validationState: item.engineResult?.enforcedBy === "user_preferences" ? "preference_based" :
                         item.engineResult?.inheritedFrom ? "derived_haram" : "explicit_haram",
-        preferencesApplied: item.engineResult?.preferences
+        preferencesApplied: item.engineResult?.preferences,
+        wasReplaced: wasReplaced // Track if this ingredient was successfully replaced
       };
     });
     
-    // Guard: If confidenceScore is null (no ingredients evaluated), return null
-    // Otherwise ensure it's a valid number
-    const finalConfidenceScore = confidenceScore === null ? null : 
-                                  (typeof confidenceScore === "number" && !isNaN(confidenceScore) ? confidenceScore : 0);
-    
     return {
       originalText: trimmedText,
-      convertedText: convertedText,
+      convertedText: convertedText, // Always return converted text, even if low confidence
       issues: issues,
-      confidenceScore: finalConfidenceScore,
-      confidence_type: confidenceType, // "classification" or "post_conversion"
+      confidenceScore: confidenceScore, // Score reflects FINAL state after replacements
+      confidence_type: hasSubstitutions ? "post_conversion" : "classification",
       source: "json_engine" // Mark as JSON-based conversion
     };
   } catch (error) {
     console.error("Error in convertRecipeWithJson:", error);
-    // Return safe fallback on error
+    // Return safe fallback on error - still return original text even on error
     return {
       originalText: trimmedText,
       convertedText: trimmedText,
       issues: [],
-      confidenceScore: null, // null indicates error, not 0%
+      confidenceScore: 0,
       error: error.message
     };
   }
