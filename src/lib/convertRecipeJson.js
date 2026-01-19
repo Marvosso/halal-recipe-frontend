@@ -399,9 +399,21 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
     // Step 1: Detect haram/conditional ingredients using JSON knowledge base
     const detectedIngredients = detectIngredientsInText(trimmedText, userPreferences);
     
+    // Debug: log detected ingredients
+    console.log("[CONVERSION DEBUG] Detected ingredients:", detectedIngredients.map(i => ({
+      ingredient: i.ingredient_id || i.ingredient,
+      replacement: i.replacement_id || i.replacement,
+      matchedTerm: i.matchedTerm
+    })));
+    
     // Step 2: Replace ingredients in text
     const convertedText = replaceIngredientsInText(trimmedText, detectedIngredients);
     const hasSubstitutions = convertedText !== trimmedText;
+    
+    // Debug: log if substitutions occurred
+    if (!hasSubstitutions && detectedIngredients.length > 0) {
+      console.warn("[CONVERSION DEBUG] Ingredients detected but no substitutions occurred");
+    }
     
     // Step 3: Calculate confidence score with type (uses shared scoring from halalEngine)
     const confidenceResult = calculateRecipeConfidenceScore(detectedIngredients, userPreferences, hasSubstitutions);
