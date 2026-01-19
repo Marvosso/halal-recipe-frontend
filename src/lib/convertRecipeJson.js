@@ -191,31 +191,50 @@ function replaceIngredientsInText(recipeText, detectedIngredients) {
  * Applies recipe-level penalties (missing replacements) on top of per-ingredient scores
  */
 function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {}, hasSubstitutions = false) {
+  // Guard: If no ingredients evaluated, return null (not 0%)
   if (!detectedIngredients || detectedIngredients.length === 0) {
-    return { score: 100, confidence_type: hasSubstitutions ? "post_conversion" : "classification" };
+    return { score: null, confidence_type: hasSubstitutions ? "post_conversion" : "classification" };
   }
   
   const strictness = userPreferences.strictnessLevel || "standard";
   
+  // Count ingredient outcomes
+  let halalCount = 0;
+  let haramCount = 0;
+  let conditionalCount = 0;
+  let unknownCount = 0;
+  let totalEvaluated = detectedIngredients.length;
+  
   // Use shared confidence scoring from halalEngine for each ingredient
-  // Aggregate all ingredient confidence impacts
+  // Aggregate all ingredient confidence impacts and track statuses
   let aggregatedImpact = 0;
-  let maxBaseConfidence = 1.0;
+  let minBaseConfidence = 1.0; // Track worst case (lowest confidence)
   let hasAnyInheritance = false;
   
   for (const item of detectedIngredients) {
     const engineResult = item.engineResult || {};
     const impact = engineResult.confidenceImpact || item.confidenceImpact || 0;
     
-    // Track most severe status (lowest base confidence)
+    // Track ingredient status for counting
     const itemStatus = engineResult.status || item.status || "unknown";
+    if (itemStatus === "halal") {
+      halalCount++;
+    } else if (itemStatus === "haram") {
+      haramCount++;
+    } else if (itemStatus === "conditional") {
+      conditionalCount++;
+    } else {
+      unknownCount++;
+    }
+    
+    // Track most severe status (lowest base confidence)
     const itemBaseConfidence = itemStatus === "haram" ? 0.0 :
                                itemStatus === "conditional" ? 0.6 :
                                itemStatus === "questionable" ? 0.5 :
                                itemStatus === "unknown" ? 0.4 : 1.0;
     
-    if (itemBaseConfidence < maxBaseConfidence) {
-      maxBaseConfidence = itemBaseConfidence;
+    if (itemBaseConfidence < minBaseConfidence) {
+      minBaseConfidence = itemBaseConfidence;
     }
     
     // Aggregate confidence impacts
@@ -229,27 +248,42 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
     }
   }
   
-  // Use shared calculateConfidenceScore from halalEngine
-  // If substitutions exist, start with higher base confidence (replacements improve confidence)
-  let effectiveBaseConfidence = maxBaseConfidence;
+  // Calculate base confidence based on ingredient outcomes
+  // Weighted average: more haram/unknown = lower confidence
+  const haramWeight = haramCount / totalEvaluated;
+  const unknownWeight = unknownCount / totalEvaluated;
+  const conditionalWeight = conditionalCount / totalEvaluated;
+  const halalWeight = halalCount / totalEvaluated;
+  
+  // Base confidence: start from worst case, but improve based on halal ratio
+  let effectiveBaseConfidence = minBaseConfidence;
+  
+  // If substitutions exist, boost confidence (replacements are positive)
   if (hasSubstitutions) {
-    // When replacements exist, boost base confidence (replacements are positive)
-    // Start from a higher base (e.g., 0.8 instead of 0.0 for haram items)
-    effectiveBaseConfidence = Math.max(maxBaseConfidence, 0.8);
-    
     // Count how many items have replacements
     const withReplacement = detectedIngredients.filter(
       (item) => item.replacement_id && item.replacement_id.trim() !== "" && item.replacement_id !== "Halal alternative needed"
     ).length;
     
-    // Boost confidence based on replacement ratio
     if (withReplacement > 0) {
-      const replacementRatio = withReplacement / detectedIngredients.length;
-      // Scale from 0.8 to 0.95 based on replacement ratio
-      effectiveBaseConfidence = 0.8 + (replacementRatio * 0.15);
+      const replacementRatio = withReplacement / totalEvaluated;
+      // Boost base confidence: if all haram items are replaced, confidence should be higher
+      // Scale from minBaseConfidence to 0.9 based on replacement ratio
+      effectiveBaseConfidence = minBaseConfidence + (replacementRatio * (0.9 - minBaseConfidence));
+    } else {
+      // No replacements but substitutions exist (shouldn't happen, but handle gracefully)
+      effectiveBaseConfidence = Math.max(minBaseConfidence, 0.5);
     }
+  } else {
+    // No substitutions: use weighted average based on ingredient statuses
+    // Halal ingredients boost confidence, haram/unknown reduce it
+    effectiveBaseConfidence = (halalWeight * 1.0) + 
+                              (conditionalWeight * 0.6) + 
+                              (unknownWeight * 0.4) + 
+                              (haramWeight * 0.0);
   }
   
+  // Calculate base score using shared function
   let baseScore = calculateConfidenceScore(
     effectiveBaseConfidence,
     aggregatedImpact,
@@ -277,6 +311,13 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
   if (withInheritance > 1) {
     // Extra 5% penalty for multiple inheritance chains
     baseScore *= 0.95;
+  }
+  
+  // Ensure score is never 0% unless truly 0 (all haram, no replacements)
+  // If we have evaluated ingredients, minimum score should reflect that
+  if (baseScore === 0 && totalEvaluated > 0 && (halalCount > 0 || conditionalCount > 0 || hasSubstitutions)) {
+    // If there are any halal/conditional ingredients or substitutions, score shouldn't be 0
+    baseScore = Math.max(10, baseScore); // Minimum 10% if ingredients were evaluated
   }
   
   return {
@@ -366,11 +407,16 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
       };
     });
     
+    // Guard: If confidenceScore is null (no ingredients evaluated), return null
+    // Otherwise ensure it's a valid number
+    const finalConfidenceScore = confidenceScore === null ? null : 
+                                  (typeof confidenceScore === "number" && !isNaN(confidenceScore) ? confidenceScore : 0);
+    
     return {
       originalText: trimmedText,
       convertedText: convertedText,
       issues: issues,
-      confidenceScore: confidenceScore,
+      confidenceScore: finalConfidenceScore,
       confidence_type: confidenceType, // "classification" or "post_conversion"
       source: "json_engine" // Mark as JSON-based conversion
     };
@@ -381,7 +427,7 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
       originalText: trimmedText,
       convertedText: trimmedText,
       issues: [],
-      confidenceScore: 0,
+      confidenceScore: null, // null indicates error, not 0%
       error: error.message
     };
   }

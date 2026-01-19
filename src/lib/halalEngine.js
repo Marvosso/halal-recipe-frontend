@@ -42,11 +42,16 @@ const STATUS_SCORE = {
  * - Recipe confidence score calculation
  */
 export function calculateConfidenceScore(baseConfidence, confidenceImpact, strictness = "standard", hasInheritance = false) {
-  let score = 100;
+  // Start with base confidence scaled to 0-100
+  // baseConfidence is 0-1 (0.0 = haram, 1.0 = halal)
+  let score = baseConfidence * 100;
   
   // Apply confidence impact (negative values reduce score)
   if (confidenceImpact < 0) {
-    score = Math.max(0, 100 + confidenceImpact);
+    score = Math.max(0, score + confidenceImpact);
+  } else if (confidenceImpact > 0) {
+    // Positive impacts can boost score (up to 100)
+    score = Math.min(100, score + confidenceImpact);
   }
   
   // Adjust for strictness
