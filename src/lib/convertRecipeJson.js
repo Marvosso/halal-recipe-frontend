@@ -335,11 +335,23 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
     baseScore *= 0.95;
   }
   
-  // Ensure score is never 0% unless truly 0 (all haram, no replacements)
-  // If we have evaluated ingredients, minimum score should reflect that
-  if (baseScore === 0 && totalEvaluated > 0 && (halalCount > 0 || conditionalCount > 0 || hasSubstitutions)) {
-    // If there are any halal/conditional ingredients or substitutions, score shouldn't be 0
-    baseScore = Math.max(10, baseScore); // Minimum 10% if ingredients were evaluated
+  // Ensure score reflects successful replacements
+  // If all ingredients are replaced, confidence should be high (80-100%)
+  if (hasSubstitutions && replacementRatio === 1.0 && baseScore < 80) {
+    // All items successfully replaced - ensure high confidence
+    baseScore = Math.max(80, baseScore);
+  }
+  
+  // Guard: Never return 0% unless truly 0 (all haram, no replacements)
+  // If we have evaluated ingredients with replacements or halal items, minimum score should reflect that
+  if (baseScore === 0 && totalEvaluated > 0) {
+    if (halalCount > 0 || conditionalCount > 0) {
+      // Has halal/conditional ingredients - score shouldn't be 0
+      baseScore = Math.max(10, baseScore);
+    } else if (hasSubstitutions && withReplacement > 0) {
+      // Has substitutions with replacements - score shouldn't be 0
+      baseScore = Math.max(20, baseScore);
+    }
   }
   
   return {
