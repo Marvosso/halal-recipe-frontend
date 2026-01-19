@@ -258,21 +258,55 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
   // Base confidence: start from worst case, but improve based on halal ratio
   let effectiveBaseConfidence = minBaseConfidence;
   
+  // Count replacements
+  const withReplacement = detectedIngredients.filter(
+    (item) => item.replacement_id && item.replacement_id.trim() !== "" && item.replacement_id !== "Halal alternative needed"
+  ).length;
+  const withoutReplacement = detectedIngredients.length - withReplacement;
+  const replacementRatio = withReplacement / totalEvaluated;
+  
   // If substitutions exist, boost confidence (replacements are positive)
   if (hasSubstitutions) {
-    // Count how many items have replacements
-    const withReplacement = detectedIngredients.filter(
-      (item) => item.replacement_id && item.replacement_id.trim() !== "" && item.replacement_id !== "Halal alternative needed"
-    ).length;
-    
     if (withReplacement > 0) {
-      const replacementRatio = withReplacement / totalEvaluated;
-      // Boost base confidence: if all haram items are replaced, confidence should be higher
-      // Scale from minBaseConfidence to 0.9 based on replacement ratio
-      effectiveBaseConfidence = minBaseConfidence + (replacementRatio * (0.9 - minBaseConfidence));
+      // When replacements exist, the negative impact is reduced/eliminated
+      // Reduce aggregatedImpact proportionally to replacement ratio
+      // If all items are replaced, eliminate the negative impact entirely
+      const adjustedImpact = aggregatedImpact * (1 - replacementRatio);
+      
+      // Boost base confidence: if all haram items are replaced, confidence should be high
+      // Scale from minBaseConfidence to 0.95 based on replacement ratio
+      // When replacementRatio = 1.0 (all replaced), baseConfidence should be 0.95
+      // When replacementRatio = 0.0 (none replaced), baseConfidence = minBaseConfidence
+      effectiveBaseConfidence = minBaseConfidence + (replacementRatio * (0.95 - minBaseConfidence));
+      
+      // Calculate base score using adjusted impact (reduced negative impact for replaced items)
+      baseScore = calculateConfidenceScore(
+        effectiveBaseConfidence,
+        adjustedImpact, // Use adjusted impact (reduced for replaced items)
+        strictness,
+        hasAnyInheritance
+      );
+      
+      // Apply penalties for missing replacements
+      if (withoutReplacement > 0) {
+        // Missing replacement reduces confidence by 20% per missing item
+        baseScore *= Math.pow(0.8, withoutReplacement);
+      }
+      
+      // Boost for successful full replacement (all items replaced)
+      if (replacementRatio === 1.0) {
+        // All items successfully replaced - high confidence
+        baseScore = Math.min(100, baseScore * 1.05); // Slight boost to reach 95-100%
+      }
     } else {
       // No replacements but substitutions exist (shouldn't happen, but handle gracefully)
       effectiveBaseConfidence = Math.max(minBaseConfidence, 0.5);
+      baseScore = calculateConfidenceScore(
+        effectiveBaseConfidence,
+        aggregatedImpact,
+        strictness,
+        hasAnyInheritance
+      );
     }
   } else {
     // No substitutions: use weighted average based on ingredient statuses
@@ -281,26 +315,14 @@ function calculateRecipeConfidenceScore(detectedIngredients, userPreferences = {
                               (conditionalWeight * 0.6) + 
                               (unknownWeight * 0.4) + 
                               (haramWeight * 0.0);
-  }
-  
-  // Calculate base score using shared function
-  let baseScore = calculateConfidenceScore(
-    effectiveBaseConfidence,
-    aggregatedImpact,
-    strictness,
-    hasAnyInheritance
-  );
-  
-  // Additional recipe-level penalties (post-conversion only)
-  if (hasSubstitutions) {
-    const withoutReplacement = detectedIngredients.filter(
-      (item) => !item.replacement_id || item.replacement_id.trim() === "" || item.replacement_id === "Halal alternative needed"
-    ).length;
     
-    if (withoutReplacement > 0) {
-      // Missing replacement is a critical issue: reduce by 25% per missing item
-      baseScore *= Math.pow(0.75, withoutReplacement);
-    }
+    // Calculate base score using shared function
+    baseScore = calculateConfidenceScore(
+      effectiveBaseConfidence,
+      aggregatedImpact,
+      strictness,
+      hasAnyInheritance
+    );
   }
   
   // Additional inheritance penalty for recipes with multiple inherited ingredients
