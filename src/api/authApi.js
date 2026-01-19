@@ -77,13 +77,31 @@ export async function register(email, password, displayName) {
 
     return response.data;
   } catch (error) {
-    logger.error("Registration error:", error);
+    // Log actual error for debugging (as requested)
+    logger.error("Registration error:", {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: {
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+        method: error.config?.method
+      }
+    });
     
     // Handle HTML error responses (e.g., 404 from Express)
     if (error.response?.data && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE')) {
       const baseURL = await getAPIBaseURL();
+      // Do NOT show generic "backend not running" unless confirmed
+      const errorText = error.response.data;
+      if (errorText.includes('Cannot POST') || errorText.includes('Cannot GET')) {
+        throw { 
+          error: `Backend route not found. Please check that the backend is deployed and the route /api/auth/register exists at ${baseURL}.` 
+        };
+      }
       throw { 
-        error: `Backend server not responding correctly. Please ensure the backend is running at ${baseURL}. If you're in production, check that the backend is deployed.` 
+        error: `Backend server returned HTML error. Please check that the backend is running at ${baseURL}.` 
       };
     }
     
@@ -92,12 +110,17 @@ export async function register(email, password, displayName) {
       throw { error: error.response.data.error };
     }
     
-    // Handle network errors
-    if (error.code === "ECONNREFUSED" || error.message?.includes("Network Error")) {
-      throw { error: "Unable to connect to server. Please check your internet connection and ensure the backend is running." };
+    // Handle network errors - only show generic message if confirmed
+    if (error.code === "ECONNREFUSED") {
+      const baseURL = await getAPIBaseURL();
+      throw { error: `Unable to connect to backend at ${baseURL}. Please ensure the backend server is running.` };
     }
     
-    // Handle HTTP status errors
+    if (error.message?.includes("Network Error") || error.message?.includes("timeout")) {
+      throw { error: `Network error: ${error.message}. Please check your internet connection.` };
+    }
+    
+    // Handle HTTP status errors with specific messages
     if (error.response?.status === 400) {
       throw { error: error.response.data?.error || "Invalid request. Please check your input." };
     }
@@ -106,7 +129,11 @@ export async function register(email, password, displayName) {
       throw { error: "An account with this email already exists." };
     }
     
-    // Generic fallback
+    if (error.response?.status === 500) {
+      throw { error: "Server error. Please try again later." };
+    }
+    
+    // Generic fallback with actual error message
     throw { error: error.message || "Registration failed. Please try again." };
   }
 }

@@ -165,22 +165,39 @@ function QuickLookup({ onConvertClick }) {
         
         // Convert HKM result to QuickLookup format using shared evaluation result
         // All fields come from evaluateItem (single source of truth)
-        const confidencePercentage = hkmResult.confidencePercentage !== undefined
-          ? hkmResult.confidencePercentage
-          : Math.round((hkmResult.confidence || 0) * 100);
+        // Ensure confidenceScore is ALWAYS present (0-100), never undefined
+        const confidenceScore = hkmResult.confidenceScore !== undefined
+          ? hkmResult.confidenceScore
+          : (hkmResult.confidencePercentage !== undefined
+              ? hkmResult.confidencePercentage
+              : (hkmResult.confidence !== undefined
+                  ? Math.round(hkmResult.confidence * 100)
+                  : 50)); // Default to 50 if truly missing, not 0
         
         // Use explanation from evaluateItem (single source of truth)
-        const explanation = hkmResult.explanation || hkmResult.eli5 || hkmResult.notes || 
+        const explanation = hkmResult.explanation || hkmResult.notes || 
                            (hkmResult.status === "unknown" ? "Insufficient data — please verify" : "Status determined by Halal Knowledge Model.");
+        const simpleExplanation = hkmResult.simpleExplanation || hkmResult.eli5 || 
+                                  "In simple terms: this ingredient is not halal and needs a replacement.";
+        
+        // Temporary console.log at boundary (as requested)
+        console.log("[CONFIDENCE DEBUG] QuickLookup result:", {
+          ingredient: normalizedTerm,
+          confidenceScore: confidenceScore,
+          hasConfidenceScore: hkmResult.confidenceScore !== undefined,
+          status: hkmResult.status
+        });
         
         result = {
           status: uiStatus,
-          explanation: explanation, // From evaluateItem (single source of truth)
+          explanation: explanation, // Full explanation from evaluateItem
+          simpleExplanation: simpleExplanation, // ELI5 format from evaluateItem
           alternatives: hkmResult.alternatives || [],
-          confidence: confidencePercentage / 100, // Keep 0-1 for backward compatibility
-          confidencePercentage: confidencePercentage, // From evaluateItem
+          confidence: confidenceScore / 100, // Keep 0-1 for backward compatibility
+          confidenceScore: confidenceScore, // PRIMARY: 0-100 format
+          confidencePercentage: confidenceScore, // Alias
           trace: hkmResult.trace || [],
-          eli5: hkmResult.eli5 || hkmResult.explanation || "", // From evaluateItem
+          eli5: simpleExplanation, // ELI5 format (alias for simpleExplanation)
           notes: hkmResult.notes || "", // From evaluateItem
           inheritedFrom: hkmResult.inheritedFrom || null,
           inheritanceChain: inheritanceChain.length > 0 ? inheritanceChain : (hkmResult.inheritanceChain || null),
@@ -298,15 +315,26 @@ function QuickLookup({ onConvertClick }) {
             </div>
             
             {/* Explanation - Show ELI5 if enabled, full explanation if disabled */}
-            {simpleExplanationEnabled && result.eli5 ? (
-              <div className="eli5-section">
-                <p className="eli5-text">
-                  <strong>In simple terms:</strong> {result.eli5}
-                </p>
-              </div>
+            {simpleExplanationEnabled ? (
+              // Show simple explanation when ELI5 toggle is ON
+              (result.simpleExplanation || result.eli5) ? (
+                <div className="eli5-section">
+                  <p className="eli5-text">
+                    <strong>In simple terms:</strong> {result.simpleExplanation || result.eli5}
+                  </p>
+                </div>
+              ) : (
+                // Fallback if simpleExplanation is missing
+                <div className="eli5-section">
+                  <p className="eli5-text">
+                    <strong>In simple terms:</strong> this ingredient is not halal and needs a replacement.
+                  </p>
+                </div>
+              )
             ) : (
+              // Show full explanation when ELI5 toggle is OFF
               <div className="result-explanation-section">
-                <p className="result-explanation">{result.explanation}</p>
+                <p className="result-explanation">{result.explanation || result.notes || "No explanation available."}</p>
                 {result.notes && result.notes !== result.explanation && (
                   <p className="result-notes">{result.notes}</p>
                 )}

@@ -83,6 +83,15 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
             // Get replacement ingredient ID (first alternative)
             const replacementId = entry?.alternatives?.[0] || engineResult.alternatives?.[0] || null;
             
+            // Ensure confidenceScore is passed through correctly
+            const confidenceScore = engineResult.confidenceScore !== undefined 
+              ? engineResult.confidenceScore 
+              : (engineResult.confidencePercentage !== undefined 
+                  ? engineResult.confidencePercentage 
+                  : (engineResult.confidence !== undefined 
+                      ? Math.round(engineResult.confidence * 100) 
+                      : 50)); // Default to 50 if truly missing, not 0
+            
             detected.push({
               ingredient_id: normalizedKey, // Internal ID (snake_case)
               ingredient: normalizedKey, // Keep for backward compatibility
@@ -95,7 +104,8 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
               notes: engineResult.notes || entry?.notes || "",
               severity: entry?.confidence_score_base === 0.1 ? "high" : 
                        entry?.confidence_score_base === 0.5 ? "medium" : "low",
-              confidence: engineResult.confidence || entry?.confidence_score_base || 0.5,
+              confidence: confidenceScore / 100, // 0-1 format for backward compatibility
+              confidenceScore: confidenceScore, // PRIMARY: 0-100 format
               quranReference: engineResult.references?.find(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran")) || "",
               hadithReference: engineResult.references?.find(r => r.toLowerCase().includes("hadith") || r.toLowerCase().includes("bukhari") || r.toLowerCase().includes("muslim")) || "",
               engineResult: engineResult,
@@ -318,6 +328,17 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
       if (item.quranReference) references.push(item.quranReference);
       if (item.hadithReference) references.push(item.hadithReference);
       
+      // Ensure confidenceScore is passed through
+      const issueConfidenceScore = item.confidenceScore !== undefined
+        ? item.confidenceScore
+        : (item.engineResult?.confidenceScore !== undefined
+            ? item.engineResult.confidenceScore
+            : (item.engineResult?.confidencePercentage !== undefined
+                ? item.engineResult.confidencePercentage
+                : (item.engineResult?.confidence !== undefined
+                    ? Math.round(item.engineResult.confidence * 100)
+                    : undefined)));
+      
       return {
         ingredient_id: item.ingredient_id || item.ingredient, // Internal ID
         ingredient: item.ingredient_id || item.ingredient, // Keep for backward compatibility
@@ -326,13 +347,16 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
         notes: item.notes,
         severity: item.severity,
         confidence: item.confidence,
+        confidenceScore: issueConfidenceScore, // PRIMARY: 0-100 format
         quranReference: item.quranReference,
         hadithReference: item.hadithReference,
         references: references,
         // Add knowledge engine fields
         inheritedFrom: item.engineResult?.inheritedFrom,
         alternatives: item.alternatives,
-        eli5: item.engineResult?.eli5,
+        eli5: item.engineResult?.eli5 || item.engineResult?.simpleExplanation,
+        simpleExplanation: item.engineResult?.simpleExplanation || item.engineResult?.eli5,
+        explanation: item.engineResult?.explanation || item.notes,
         trace: item.engineResult?.trace || [],
         tags: item.engineResult?.tags,
         hkmResult: item.engineResult,

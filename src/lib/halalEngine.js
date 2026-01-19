@@ -240,14 +240,17 @@ export function evaluateItem(itemId, options = {}) {
   if (!rootItem) {
     // Unknown ingredient - explicitly marked with neutral confidence impact
     const normalizedDisplayName = formatIngredientName(normalizedId);
+    const unknownConfidenceScore = calculateConfidenceScore(STATUS_SCORE.unknown, 0, strictness, false);
     
     return {
       status: "unknown",
-      confidence: calculateConfidenceScore(STATUS_SCORE.unknown, 0, strictness, false) / 100, // 0-1 format
-      confidencePercentage: calculateConfidenceScore(STATUS_SCORE.unknown, 0, strictness, false), // 0-100 format
+      confidenceScore: unknownConfidenceScore, // PRIMARY: 0-100 format (required)
+      confidence: unknownConfidenceScore / 100, // Backward compatibility: 0-1 format
+      confidencePercentage: unknownConfidenceScore, // Alias for confidenceScore
       trace: [`Unknown item: ${normalizedId}`],
       eli5: "Insufficient data — please verify",
-      explanation: "Insufficient data — please verify", // Explicit explanation for unknown
+      simpleExplanation: "Insufficient data — please verify", // ELI5 format
+      explanation: "Insufficient data — please verify", // Full explanation
       alternatives: [],
       notes: "Insufficient data — please verify",
       references: [],
@@ -307,16 +310,22 @@ export function evaluateItem(itemId, options = {}) {
   // Normalize display name using shared utility (snake_case → human-readable)
   const finalDisplayName = displayName || rootItem.displayName || formatIngredientName(normalizedId);
 
-  // Build explanation from ELI5 or notes (single source of truth)
-  const explanation = eli5 || notes || "";
+  // Build explanations - separate ELI5 from full explanation
+  const simpleExplanation = eli5 || (notes ? `In simple terms: ${notes}` : "");
+  const explanation = notes || eli5 || "";
+
+  // Ensure confidenceScore is ALWAYS a number 0-100, never undefined or 0 unless truly 0
+  const confidenceScore = finalConfidence; // Already 0-100 from calculateConfidenceScore
 
   const result = {
     status: finalRuling,
-    confidence: finalConfidence / 100, // Return as 0-1 for compatibility
-    confidencePercentage: finalConfidence, // New: percentage (0-100)
+    confidenceScore: confidenceScore, // PRIMARY: 0-100 format (required, never undefined)
+    confidence: confidenceScore / 100, // Backward compatibility: 0-1 format
+    confidencePercentage: confidenceScore, // Alias for confidenceScore
     trace: fullTrace,
-    eli5: explanation,
-    explanation: explanation, // Explicit explanation field (single source of truth)
+    eli5: simpleExplanation, // ELI5 format (simple explanation)
+    simpleExplanation: simpleExplanation, // Explicit ELI5 field
+    explanation: explanation, // Full explanation field
     tags: uniqueTags.length > 0 ? uniqueTags : undefined,
     alternatives: uniqueAlternatives.length > 0 ? uniqueAlternatives : undefined,
     notes: notes || undefined,

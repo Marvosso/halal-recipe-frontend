@@ -214,7 +214,23 @@ function App() {
           const jsonResult = convertRecipeWithJson(trimmedRecipe, halalSettings);
           convertedText = jsonResult.convertedText || "";
           convertedIssues = Array.isArray(jsonResult.issues) ? jsonResult.issues : [];
-          convertedConfidence = typeof jsonResult.confidenceScore === "number" ? jsonResult.confidenceScore : 0;
+          // Ensure confidenceScore is never 0 unless truly 0
+          convertedConfidence = typeof jsonResult.confidenceScore === "number" && !isNaN(jsonResult.confidenceScore)
+            ? jsonResult.confidenceScore
+            : (typeof jsonResult.confidence === "number" && !isNaN(jsonResult.confidence)
+                ? Math.round(jsonResult.confidence * 100)
+                : null); // null indicates missing, not 0
+          
+          // Temporary console.log at boundary (as requested)
+          console.log("[CONFIDENCE DEBUG] Recipe conversion result:", {
+            confidenceScore: convertedConfidence,
+            hasIssues: convertedIssues.length > 0,
+            issuesWithConfidence: convertedIssues.map(i => ({
+              ingredient: i.ingredient_id || i.ingredient,
+              confidenceScore: i.confidenceScore || i.engineResult?.confidenceScore
+            }))
+          });
+          
           jsonConversionUsed = true;
         } catch (jsonError) {
           console.warn("JSON conversion failed, falling back to backend API:", jsonError);
@@ -1092,8 +1108,19 @@ Instructions:
 
                 <div className="confidence-section">
                   <div className="confidence-header">
-                    <h3>{t("confidenceScore")}: {adjustConfidenceScore(safeConfidence)}%</h3>
+                    <h3>
+                      {t("confidenceScore")}: {
+                        safeConfidence === null || safeConfidence === undefined
+                          ? "Confidence unavailable — evaluation error"
+                          : `${adjustConfidenceScore(safeConfidence)}%`
+                      }
+                    </h3>
                     {(() => {
+                      // Defensive: don't show badge if confidence is unavailable
+                      if (safeConfidence === null || safeConfidence === undefined) {
+                        return null;
+                      }
+                      
                       const adjustedScore = adjustConfidenceScore(safeConfidence);
                       let badgeText = "";
                       let badgeClass = "";
@@ -1113,7 +1140,11 @@ Instructions:
                   <div className="confidence-progress">
                     <div 
                       className="confidence-bar" 
-                      style={{ width: `${adjustConfidenceScore(safeConfidence)}%` }}
+                      style={{ 
+                        width: safeConfidence === null || safeConfidence === undefined
+                          ? "0%"
+                          : `${adjustConfidenceScore(safeConfidence)}%`
+                      }}
                     ></div>
                   </div>
                 </div>
@@ -1275,22 +1306,35 @@ Instructions:
                                     )}
                                     
                                     {/* ELI5 from Knowledge Model - Show based on toggle */}
-                                    {issue?.eli5 && simpleExplanationEnabled ? (
-                                      <div className="ingredient-detail-row">
-                                        <span className="detail-label">Simple Explanation:</span>
-                                        <span className="detail-value eli5-value">{issue.eli5}</span>
-                                      </div>
-                                    ) : issue?.notes && !simpleExplanationEnabled ? (
-                                      <div className="ingredient-detail-row">
-                                        <span className="detail-label">Explanation:</span>
-                                        <span className="detail-value">{issue.notes}</span>
-                                      </div>
-                                    ) : issue?.explanation && !simpleExplanationEnabled ? (
-                                      <div className="ingredient-detail-row">
-                                        <span className="detail-label">Explanation:</span>
-                                        <span className="detail-value">{issue.explanation}</span>
-                                      </div>
-                                    ) : null}
+                                    {simpleExplanationEnabled ? (
+                                      // Show simple explanation when ELI5 toggle is ON
+                                      (issue?.simpleExplanation || issue?.eli5) ? (
+                                        <div className="ingredient-detail-row">
+                                          <span className="detail-label">Simple Explanation:</span>
+                                          <span className="detail-value eli5-value">
+                                            {issue.simpleExplanation || issue.eli5}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        // Fallback if simpleExplanation is missing
+                                        <div className="ingredient-detail-row">
+                                          <span className="detail-label">Simple Explanation:</span>
+                                          <span className="detail-value eli5-value">
+                                            In simple terms: this ingredient is not halal and needs a replacement.
+                                          </span>
+                                        </div>
+                                      )
+                                    ) : (
+                                      // Show full explanation when ELI5 toggle is OFF
+                                      (issue?.explanation || issue?.notes) ? (
+                                        <div className="ingredient-detail-row">
+                                          <span className="detail-label">Explanation:</span>
+                                          <span className="detail-value">
+                                            {issue.explanation || issue.notes}
+                                          </span>
+                                        </div>
+                                      ) : null
+                                    )}
                                     
                                     {/* Derived Ingredient Warning */}
                                     {issue?.trace && Array.isArray(issue.trace) && issue.trace.length > 1 && (
