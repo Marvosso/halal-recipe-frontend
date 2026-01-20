@@ -88,7 +88,6 @@ function App() {
       if (typeof Storage !== "undefined") {
         const saved = localStorage.getItem("halalRecipes");
         const publicRecipesData = localStorage.getItem("halalPublicRecipes");
-        const simpleExplanation = localStorage.getItem("simpleExplanationEnabled");
         const strictness = localStorage.getItem("halalStrictnessLevel");
         const school = localStorage.getItem("halalSchoolOfThought");
         
@@ -104,10 +103,6 @@ function App() {
           if (Array.isArray(parsed)) {
             setPublicRecipes(parsed);
           }
-        }
-
-        if (simpleExplanation === "true") {
-          setSimpleExplanationEnabled(true);
         }
 
         if (strictness) {
