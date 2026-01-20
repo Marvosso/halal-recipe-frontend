@@ -3,7 +3,6 @@ import { Search, X, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { evaluateItem } from "../lib/halalEngine";
 import { FEATURES } from "../lib/featureFlags";
 import { formatIngredientName } from "../lib/ingredientDisplay";
-import SimpleExplanationToggle from "./SimpleExplanationToggle";
 import "./QuickLookup.css";
 
 function QuickLookup({ onConvertClick }) {
