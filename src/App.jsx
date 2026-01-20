@@ -51,7 +51,7 @@ function App() {
   const [isOffline, setIsOffline] = useState(false);
   const [showCachedResult, setShowCachedResult] = useState(false);
 
-  // Listen for auth modal trigger
+  // Listen for auth modal trigger and other events
   useEffect(() => {
     const handleShowAuthModal = (e) => {
       const mode = e.detail?.mode || "login";
@@ -59,8 +59,32 @@ function App() {
       setShowAuthModal(true);
     };
     
+    // Listen for recipe loading from saved recipes
+    const handleLoadRecipe = (e) => {
+      const { recipe, converted, issues } = e.detail || {};
+      if (recipe) {
+        setRecipe(recipe);
+        setConverted(converted || "");
+        setIssues(issues || []);
+      }
+    };
+    
+    // Listen for tab switching
+    const handleSwitchTab = (e) => {
+      const tab = e.detail?.tab;
+      if (tab) {
+        setActiveTab(tab);
+      }
+    };
+    
     window.addEventListener("showAuthModal", handleShowAuthModal);
-    return () => window.removeEventListener("showAuthModal", handleShowAuthModal);
+    window.addEventListener("loadRecipe", handleLoadRecipe);
+    window.addEventListener("switchTab", handleSwitchTab);
+    return () => {
+      window.removeEventListener("showAuthModal", handleShowAuthModal);
+      window.removeEventListener("loadRecipe", handleLoadRecipe);
+      window.removeEventListener("switchTab", handleSwitchTab);
+    };
   }, []);
 
   // Load user data and saved recipes on mount
