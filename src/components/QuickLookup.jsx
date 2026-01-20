@@ -377,7 +377,7 @@ function QuickLookup({ onConvertClick }) {
                 <strong>Halal Alternatives:</strong>
                 <ul>
                   {result.alternatives.map((alt, idx) => (
-                    <li key={idx}>{alt}</li>
+                    <li key={idx}>{formatIngredientName(alt)}</li>
                   ))}
                 </ul>
               </div>

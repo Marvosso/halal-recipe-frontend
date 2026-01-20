@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Heart, MessageCircle, Share2, Bookmark, MoreVertical, Clock, ChefHat } from "lucide-react";
+import { formatIngredientName } from "../lib/ingredientDisplay";
 import CommentSection from "./CommentSection";
 import "./RecipePost.css";
 
@@ -251,7 +252,7 @@ function RecipePost({ post, onLike, onSave, onComment }) {
                           <span className="post-ingredient-label">Alternatives:</span>
                           <ul className="post-ingredient-alternatives">
                             {ingredient.alternatives.map((alt, altIdx) => (
-                              <li key={altIdx}>{alt}</li>
+                              <li key={altIdx}>{formatIngredientName(alt)}</li>
                             ))}
                           </ul>
                         </div>

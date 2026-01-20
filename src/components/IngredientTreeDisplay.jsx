@@ -6,6 +6,7 @@
 
 import React, { useState } from "react";
 import { formatInheritanceChain, getChildrenTree } from "../lib/ingredientsDisplay";
+import { formatIngredientName } from "../lib/ingredientDisplay";
 import "./IngredientTreeDisplay.css";
 
 function IngredientTreeDisplay({ ingredientName, showTree = false }) {
@@ -35,7 +36,7 @@ function IngredientTreeDisplay({ ingredientName, showTree = false }) {
         </div>
         {node.alternatives && node.alternatives.length > 0 && (
           <div className="tree-node-alternatives">
-            Alternatives: {node.alternatives.join(", ")}
+            Alternatives: {node.alternatives.map(alt => formatIngredientName(alt)).join(", ")}
           </div>
         )}
         {node.children && node.children.length > 0 && (

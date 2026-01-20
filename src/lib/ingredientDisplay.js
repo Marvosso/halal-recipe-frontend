@@ -44,25 +44,40 @@ export function formatIngredientName(ingredientId) {
 /**
  * Format ingredient ID (fallback when not in display map)
  * Converts snake_case to Title Case
+ * Removes technical suffixes like "_halal", "_replacement"
  */
 export function formatIngredientId(ingredientId) {
   if (!ingredientId || typeof ingredientId !== "string") {
     return "Unknown Ingredient";
   }
 
+  let cleaned = ingredientId;
+  
+  // Remove technical suffixes (case-insensitive)
+  // Note: "_halal" suffix is removed, but "halal_" prefix is kept (just capitalized)
+  cleaned = cleaned.replace(/_halal$/i, "");
+  cleaned = cleaned.replace(/_replacement$/i, "");
+  cleaned = cleaned.replace(/_substitute$/i, "");
+  cleaned = cleaned.replace(/_alternative$/i, "");
+  
   // Replace underscores with spaces
-  let formatted = ingredientId.replace(/_/g, " ");
+  let formatted = cleaned.replace(/_/g, " ");
   
   // Capitalize first letter of each word
   formatted = formatted
     .split(" ")
     .map(word => {
       if (word.length === 0) return word;
-      // Handle special cases (e.g., "halal" should be "Halal")
+      // Handle special cases - always capitalize "halal" properly
       if (word.toLowerCase() === "halal") return "Halal";
+      // Preserve known culinary terms (e.g., "agar agar" should stay as two words)
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
-    .join(" ");
+    .join(" ")
+    .trim();
+
+  // Ensure "halal" is always capitalized (in case it appears anywhere)
+  formatted = formatted.replace(/\bhalal\b/gi, "Halal");
 
   return formatted;
 }

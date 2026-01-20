@@ -99,7 +99,10 @@ function detectIngredientsInText(recipeText, userPreferences = {}) {
               replacement_id: replacementId, // Replacement ingredient ID
               replacement: replacementId, // Keep for backward compatibility (will be formatted in UI)
               alternatives: engineResult.alternatives || entry?.alternatives || [],
-              notes: engineResult.notes || entry?.notes || "",
+              // Extract replacement ratio and culinary notes
+              replacementRatio: engineResult.replacementRatio || entry?.conversion_ratio || null,
+              culinaryNotes: engineResult.culinaryNotes || null,
+              // Notes field removed - explanation and culinaryNotes are separate
               severity: entry?.confidence_score_base === 0.1 ? "high" : 
                        entry?.confidence_score_base === 0.5 ? "medium" : "low",
               quranReference: engineResult.references?.find(r => r.toLowerCase().includes("qur'an") || r.toLowerCase().includes("quran")) || "",
@@ -383,7 +386,9 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
         ingredient: item.ingredient_id || item.ingredient, // Keep for backward compatibility
         replacement_id: item.replacement_id || item.replacement, // Replacement ID
         replacement: item.replacement_id || item.replacement, // Keep for backward compatibility
-        notes: item.notes,
+        // Replacement ratio and culinary notes
+        replacementRatio: item.replacementRatio || item.engineResult?.replacementRatio || null,
+        culinaryNotes: item.culinaryNotes || item.engineResult?.culinaryNotes || null,
         severity: item.severity,
         confidence: issueConfidenceScore ? issueConfidenceScore / 100 : undefined, // 0-1 format for backward compatibility
         confidenceScore: issueConfidenceScore, // PRIMARY: 0-100 format
@@ -395,7 +400,7 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
         alternatives: item.alternatives,
         eli5: item.engineResult?.eli5 || item.engineResult?.simpleExplanation,
         simpleExplanation: item.engineResult?.simpleExplanation || item.engineResult?.eli5,
-        explanation: item.engineResult?.explanation || item.notes,
+        explanation: item.engineResult?.explanation || "", // Religious justification only
         trace: item.engineResult?.trace || [],
         tags: item.engineResult?.tags,
         hkmResult: item.engineResult,

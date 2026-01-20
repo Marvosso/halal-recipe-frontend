@@ -1351,6 +1351,46 @@ html {
   font-family: "Inter", sans-serif;
 }
 
+/* Replacement Ratio Styling */
+.replacement-ratio-row {
+  background: var(--green-bg);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-green);
+  margin: 0.5rem 0;
+}
+
+.replacement-ratio-value {
+  font-weight: 600;
+  color: var(--primary-green);
+  font-size: 0.95rem;
+}
+
+/* Culinary Notes Styling */
+.culinary-notes-value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.culinary-note-item {
+  margin-bottom: 0.5rem;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.culinary-note-item:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--primary-green);
+  font-weight: bold;
+}
+
+.culinary-note-item:last-child {
+  margin-bottom: 0;
+}
+
 .derived-warning-section {
   margin: 1rem 0;
   padding: 1rem;

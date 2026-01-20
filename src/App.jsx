@@ -1227,6 +1227,16 @@ Instructions:
                                       <span className="detail-value">{formatIngredientName(issue?.replacement_id || issue?.replacement || "—")}</span>
                                     </div>
                                     
+                                    {/* Replacement Ratio - Display clearly under replacement ingredient */}
+                                    {issue?.replacementRatio && (
+                                      <div className="ingredient-detail-row replacement-ratio-row">
+                                        <span className="detail-label">Replacement Ratio:</span>
+                                        <span className="detail-value replacement-ratio-value">
+                                          {issue.replacementRatio}
+                                        </span>
+                                      </div>
+                                    )}
+                                    
                                     {/* Validation State Badge */}
                                     {issue?.validationState && (
                                       <div className="validation-badge-section">
@@ -1296,27 +1306,19 @@ Instructions:
                                         <div className="alternatives-list">
                                           <ul>
                                             {issue.alternatives.map((alt, idx) => (
-                                              <li key={idx}>{alt}</li>
+                                              <li key={idx}>{formatIngredientName(alt)}</li>
                                             ))}
                                           </ul>
                                         </div>
                                       </div>
                                     )}
                                     
-                                    {/* Notes from Knowledge Model */}
-                                    {(issue?.notes && issue.notes !== issue.replacement) && (
-                                      <div className="ingredient-detail-row">
-                                        <span className="detail-label">Knowledge Base Notes:</span>
-                                        <span className="detail-value">{issue.notes}</span>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Explanation from Knowledge Model - Always show detailed explanation with Islamic references */}
-                                    {(issue?.explanation || issue?.notes) ? (
+                                    {/* Explanation - Religious justification (why ingredient is not halal) */}
+                                    {issue?.explanation ? (
                                       <div className="ingredient-detail-row">
                                         <span className="detail-label">Explanation:</span>
                                         <span className="detail-value">
-                                          {issue.explanation || issue.notes}
+                                          {issue.explanation}
                                         </span>
                                       </div>
                                     ) : null}
@@ -1378,16 +1380,19 @@ Instructions:
                                         )}
                                       </div>
                                     )}
-                                    {issue?.flavor && (
+                                    {/* Culinary Guidance - Only show if helpful culinary information exists */}
+                                    {issue?.culinaryNotes && (
                                       <div className="ingredient-detail-row">
-                                        <span className="detail-label">Flavor Note:</span>
-                                        <span className="detail-value">{issue.flavor || "—"}</span>
-                                      </div>
-                                    )}
-                                    {issue?.notes && (
-                                      <div className="ingredient-detail-row">
-                                        <span className="detail-label">Additional Notes:</span>
-                                        <span className="detail-value">{issue.notes || "—"}</span>
+                                        <span className="detail-label">Culinary Guidance:</span>
+                                        <span className="detail-value culinary-notes-value">
+                                          {typeof issue.culinaryNotes === 'string' 
+                                            ? issue.culinaryNotes 
+                                            : Array.isArray(issue.culinaryNotes)
+                                              ? issue.culinaryNotes.map((note, idx) => (
+                                                  <div key={idx} className="culinary-note-item">{note}</div>
+                                                ))
+                                              : issue.culinaryNotes}
+                                        </span>
                                       </div>
                                     )}
                                     <CommunityTips

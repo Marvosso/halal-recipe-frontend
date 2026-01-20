@@ -316,8 +316,24 @@ export function evaluateItem(itemId, options = {}) {
   const finalDisplayName = displayName || rootItem.displayName || formatIngredientName(normalizedId);
 
   // Build explanations - separate ELI5 from full explanation
+  // Explanation should be religious justification (from notes or eli5)
+  // Culinary notes are separate and handled below
   const simpleExplanation = eli5 || (notes ? `In simple terms: ${notes}` : "");
   const explanation = notes || eli5 || "";
+  
+  // Extract replacement ratio and culinary notes from knowledge base
+  // Check both rootItem and halalKnowledgeFlat for these fields
+  const flatEntry = halalKnowledgeFlat[normalizedId];
+  const replacementRatio = rootItem.conversion_ratio || 
+                          rootItem.replacementRatio || 
+                          flatEntry?.conversion_ratio ||
+                          flatEntry?.replacementRatio ||
+                          null;
+  const culinaryNotes = rootItem.culinaryNotes || 
+                        rootItem.cookingNotes || 
+                        flatEntry?.culinaryNotes ||
+                        flatEntry?.cookingNotes ||
+                        null;
 
   // Ensure confidenceScore is ALWAYS a number 0-100, never undefined or 0 unless truly 0
   const confidenceScore = finalConfidence; // Already 0-100 from calculateConfidenceScore
@@ -330,10 +346,11 @@ export function evaluateItem(itemId, options = {}) {
     trace: fullTrace,
     eli5: simpleExplanation, // ELI5 format (simple explanation)
     simpleExplanation: simpleExplanation, // Explicit ELI5 field
-    explanation: explanation, // Full explanation field
+    explanation: explanation, // Religious justification (why ingredient is not halal)
+    replacementRatio: replacementRatio || undefined, // Replacement ratio (e.g., "1:0.75" or structured)
+    culinaryNotes: culinaryNotes || undefined, // Culinary guidance (flavor, texture, cooking tips)
     tags: uniqueTags.length > 0 ? uniqueTags : undefined,
     alternatives: uniqueAlternatives.length > 0 ? uniqueAlternatives : undefined,
-    notes: notes || undefined,
     references: uniqueReferences.length > 0 ? uniqueReferences : undefined,
     aliases: rootItem.aliases || undefined,
     displayName: finalDisplayName, // Normalized display name (never snake_case)

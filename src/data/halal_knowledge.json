@@ -33,7 +33,7 @@
       "smoked_turkey_bacon",
       "beef_bacon_halal"
     ],
-    "notes": "Add a dash of oil if turkey is lean",
+    "notes": "Bacon is made from pork, which is explicitly prohibited in the Qur'an (Surah Al-Baqarah 2:173).",
     "references": [
       "Surah Al-Baqarah 2:173",
       "Sahih Muslim 10:3893"
@@ -49,6 +49,11 @@
     "category": "meat",
     "school_of_thought_variation": {},
     "conversion_ratio": "1:1",
+    "culinaryNotes": [
+      "Turkey bacon has lower fat content than pork bacon - add a dash of oil when cooking if needed",
+      "Cooking time may be slightly shorter - watch for doneness",
+      "Beef bacon provides a richer, more similar flavor profile"
+    ],
     "flavor_role": "",
     "cuisine": ""
   },
@@ -251,7 +256,7 @@
       "halal_beef_gelatin",
       "pectin"
     ],
-    "notes": "Agar is stronger than gelatin. Check the source before consuming. Must be halal-certified if animal-derived",
+    "notes": "Gelatin is typically derived from pork or non-halal animals. Most scholars consider it haram unless halal-certified.",
     "references": [
       "Surah Al-Baqarah 2:173",
       "Sahih Bukhari 7:67:400"
@@ -271,7 +276,13 @@
       "maliki": "haram",
       "hanbali": "haram"
     },
-    "conversion_ratio": "1:0.5",
+    "conversion_ratio": "1 tablespoon gelatin → 2 tablespoons agar agar powder",
+    "culinaryNotes": [
+      "Agar agar sets at room temperature and requires boiling to activate",
+      "Setting time is typically 30-60 minutes (faster than gelatin)",
+      "Agar agar creates a firmer, more brittle texture than gelatin",
+      "For softer set, reduce agar agar by 25%"
+    ],
     "flavor_role": "",
     "cuisine": ""
   },
@@ -548,7 +559,7 @@
       "grape_juice_plus_vinegar",
       "non_alcoholic_wine"
     ],
-    "notes": "Use 3 parts juice + 1 part vinegar",
+    "notes": "Wine contains alcohol, which is explicitly prohibited in the Qur'an (Surah Al-Ma'idah 5:90).",
     "references": [
       "Surah Al-Ma'idah 5:90",
       "Sahih Bukhari 7:69:494"
@@ -563,7 +574,12 @@
     "eli5": "Wine contains alcohol, which is not allowed in Islam.",
     "category": "alcohol",
     "school_of_thought_variation": {},
-    "conversion_ratio": "1:0.75",
+    "conversion_ratio": "1 cup wine → ¾ cup grape juice + ¼ cup vinegar",
+    "culinaryNotes": [
+      "The combination of grape juice and vinegar mimics wine's acidity and fruity notes",
+      "For deglazing, use the same technique - the mixture will reduce similarly",
+      "If using in marinades, the vinegar helps tenderize meat like wine would"
+    ],
     "flavor_role": "",
     "cuisine": ""
   },
@@ -770,7 +786,7 @@
       "vanilla_powder",
       "vanilla_bean_paste"
     ],
-    "notes": "Ensure alcohol-free labeling. Some scholars allow trace amounts, others don't",
+    "notes": "Vanilla extract typically contains alcohol. Some scholars allow trace amounts that evaporate during cooking, while others require alcohol-free versions.",
     "references": [
       "Surah Al-Ma'idah 5:90",
       "Sahih Muslim 10:3893"
@@ -789,7 +805,12 @@
       "maliki": "questionable",
       "hanbali": "haram"
     },
-    "conversion_ratio": "1:1",
+    "conversion_ratio": "1:1 (alcohol-free vanilla extract)",
+    "culinaryNotes": [
+      "Alcohol-free vanilla extract provides the same flavor intensity",
+      "Vanilla powder can be used as a 1:1 substitute in baked goods",
+      "Vanilla bean paste offers the most authentic flavor with visible bean specks"
+    ],
     "flavor_role": "",
     "cuisine": ""
   },
