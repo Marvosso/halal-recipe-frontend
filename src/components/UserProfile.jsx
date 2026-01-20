@@ -11,6 +11,7 @@ import HalalPreferencesModal from "./HalalPreferencesModal";
 import { getUserData, isAuthenticated, clearAuth } from "../api/authApi";
 import { getProfile } from "../api/profileApi";
 import { getMyRecipes } from "../api/recipesApi";
+import LanguageSwitcher from "./LanguageSwitcher";
 import logger from "../utils/logger";
 import "./UserProfile.css";
 
@@ -25,6 +26,8 @@ function UserProfile() {
   });
   const [userPosts, setUserPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
+  const [savedRecipes, setSavedRecipes] = useState([]);
+  const [activeProfileTab, setActiveProfileTab] = useState("recipes"); // "recipes" or "saved"
   const [profile, setProfile] = useState({
     displayName: "",
     bio: "",
