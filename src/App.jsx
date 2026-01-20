@@ -1337,38 +1337,21 @@ Instructions:
                                         </div>
                                         {openReferences.has(ingredientName) && (
                                           <div className="references-accordion-content">
-                                            {simpleExplanationEnabled ? (
-                                              <div className="simple-explanation-text">
-                                                {issue?.eli5 ? (
-                                                  <p>In simple terms: {issue.eli5}</p>
-                                                ) : issue?.ingredient ? (
-                                                  <p>
-                                                    In simple terms: {issue.ingredient.toLowerCase().includes("pork") || issue.ingredient.toLowerCase().includes("bacon")
-                                                      ? "this is made from pork, which is prohibited in Islam."
-                                                      : issue.ingredient.toLowerCase().includes("wine") || issue.ingredient.toLowerCase().includes("alcohol")
-                                                      ? "this contains alcohol, which is prohibited in Islam."
-                                                      : "this ingredient is not halal (permitted) according to Islamic dietary laws."}
-                                                  </p>
-                                                ) : (
-                                                  <p>In simple terms: This ingredient is not halal (permitted) according to Islamic dietary laws.</p>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <>
-                                                {issue?.quranReference && (
-                                                  <div className="reference-item">
-                                                    <span className="reference-label">Qur'an Reference:</span>
-                                                    <span className="reference-value quran-text">{issue.quranReference}</span>
-                                                  </div>
-                                                )}
-                                                {issue?.hadithReference && (
-                                                  <div className="reference-item">
-                                                    <span className="reference-label">Hadith Reference:</span>
-                                                    <span className="reference-value hadith-text">{issue.hadithReference}</span>
-                                                  </div>
-                                                )}
-                                              </>
-                                            )}
+                                            {/* Always show detailed Islamic references in full converter */}
+                                            <>
+                                              {issue?.quranReference && (
+                                                <div className="reference-item">
+                                                  <span className="reference-label">Qur'an Reference:</span>
+                                                  <span className="reference-value quran-text">{issue.quranReference}</span>
+                                                </div>
+                                              )}
+                                              {issue?.hadithReference && (
+                                                <div className="reference-item">
+                                                  <span className="reference-label">Hadith Reference:</span>
+                                                  <span className="reference-value hadith-text">{issue.hadithReference}</span>
+                                                </div>
+                                              )}
+                                            </>
                                           </div>
                                         )}
                                       </div>
