@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { User, Palette, FileText, Save, Camera, X } from "lucide-react";
+import { User, FileText, Save, Camera, X } from "lucide-react";
 import ProfileModal from "./ProfileModal";
 import { isAuthenticated, getUserData } from "../api/authApi";
 import { getProfile, updateProfile, uploadProfilePhoto } from "../api/profileApi";
@@ -10,7 +10,6 @@ function EditProfileModal({ isOpen, onClose }) {
   const [profile, setProfile] = useState({
     displayName: "",
     bio: "",
-    avatarColor: "#0A9D58", // Default green
     profilePhoto: null,
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -32,7 +31,6 @@ function EditProfileModal({ isOpen, onClose }) {
           setProfile({
             displayName: userProfile.displayName || "",
             bio: userProfile.bio || "",
-            avatarColor: userProfile.avatarColor || "#0A9D58",
             profilePhoto: userProfile.profilePhoto || null,
           });
         } catch (apiError) {
@@ -56,7 +54,6 @@ function EditProfileModal({ isOpen, onClose }) {
         setProfile({
           displayName: userData.displayName || "",
           bio: userData.bio || "",
-          avatarColor: userData.avatarColor || "#0A9D58",
           profilePhoto: userData.profilePhoto || null,
         });
       } else {
@@ -66,7 +63,6 @@ function EditProfileModal({ isOpen, onClose }) {
           setProfile({
             displayName: parsed.displayName || "",
             bio: parsed.bio || "",
-            avatarColor: parsed.avatarColor || "#0A9D58",
             profilePhoto: null,
           });
         }
@@ -135,7 +131,6 @@ function EditProfileModal({ isOpen, onClose }) {
         const updatedUser = await updateProfile({
           displayName: profile.displayName,
           bio: profile.bio,
-          avatarColor: profile.avatarColor,
         });
         // Trigger update event
         window.dispatchEvent(new CustomEvent("profileUpdated"));
@@ -153,14 +148,6 @@ function EditProfileModal({ isOpen, onClose }) {
     }
   };
 
-  const avatarColors = [
-    { name: "Green", value: "#0A9D58" },
-    { name: "Gold", value: "#D4AF37" },
-    { name: "Blue", value: "#3B82F6" },
-    { name: "Purple", value: "#8B5CF6" },
-    { name: "Red", value: "#EF4444" },
-    { name: "Teal", value: "#14B8A6" },
-  ];
 
   return (
     <ProfileModal
@@ -277,33 +264,6 @@ function EditProfileModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          <div className="edit-profile-field">
-            <label className="edit-profile-label">
-              <Palette className="edit-profile-label-icon" />
-              <span>Avatar Color</span>
-            </label>
-            <div className="edit-profile-colors">
-              {avatarColors.map((color) => (
-                <button
-                  key={color.value}
-                  className={`edit-profile-color-btn ${
-                    profile.avatarColor === color.value ? "active" : ""
-                  }`}
-                  style={{ backgroundColor: color.value }}
-                  onClick={() => handleChange("avatarColor", color.value)}
-                  aria-label={`Select ${color.name} avatar color`}
-                  title={color.name}
-                >
-                  {profile.avatarColor === color.value && (
-                    <div className="color-check">✓</div>
-                  )}
-                </button>
-              ))}
-            </div>
-            <p className="edit-profile-hint">
-              Choose a color for your avatar background
-            </p>
-          </div>
         </div>
 
         <div className="edit-profile-actions">

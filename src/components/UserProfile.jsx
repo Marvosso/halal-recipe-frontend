@@ -28,7 +28,6 @@ function UserProfile() {
   const [profile, setProfile] = useState({
     displayName: "",
     bio: "",
-    avatarColor: "#0A9D58",
     profilePhoto: null,
     email: "",
   });
@@ -45,15 +44,39 @@ function UserProfile() {
   useEffect(() => {
     loadUserData();
     loadProfileData();
+    loadSavedRecipes();
     
     // Listen for profile updates
     const handleProfileUpdate = () => {
       loadProfileData();
     };
     
+    // Listen for saved recipes updates
+    const handleRecipesUpdate = () => {
+      loadSavedRecipes();
+    };
+    
     window.addEventListener("profileUpdated", handleProfileUpdate);
-    return () => window.removeEventListener("profileUpdated", handleProfileUpdate);
+    window.addEventListener("recipesUpdated", handleRecipesUpdate);
+    return () => {
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+      window.removeEventListener("recipesUpdated", handleRecipesUpdate);
+    };
   }, []);
+  
+  const loadSavedRecipes = () => {
+    try {
+      const saved = localStorage.getItem("halalRecipes");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setSavedRecipes(parsed);
+        }
+      }
+    } catch (error) {
+      logger.error("Error loading saved recipes:", error);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -125,7 +148,6 @@ function UserProfile() {
           setProfile({
             displayName: userProfile.displayName || "",
             bio: userProfile.bio || "",
-            avatarColor: userProfile.avatarColor || "#0A9D58",
             profilePhoto: userProfile.profilePhoto || null,
             email: userProfile.email || "",
           });
@@ -151,7 +173,6 @@ function UserProfile() {
         setProfile({
           displayName: userData.displayName || "",
           bio: userData.bio || "",
-          avatarColor: userData.avatarColor || "#0A9D58",
           profilePhoto: userData.profilePhoto || null,
           email: userData.email || "",
         });
@@ -163,7 +184,6 @@ function UserProfile() {
           setProfile({
             displayName: parsed.displayName || "",
             bio: parsed.bio || "",
-            avatarColor: parsed.avatarColor || "#0A9D58",
             profilePhoto: null,
             email: "",
           });
@@ -181,7 +201,6 @@ function UserProfile() {
         setProfile({
           displayName: "",
           bio: "",
-          avatarColor: "#0A9D58",
           profilePhoto: null,
           email: "",
         });
@@ -242,7 +261,7 @@ function UserProfile() {
           ) : (
             <div 
               className="avatar-placeholder-large"
-              style={{ background: `linear-gradient(135deg, ${profile.avatarColor} 0%, var(--accent-gold) 100%)` }}
+              style={{ background: "linear-gradient(135deg, #0A9D58 0%, var(--accent-gold) 100%)" }}
             >
               <User className="avatar-icon" />
             </div>
@@ -327,8 +346,18 @@ function UserProfile() {
 
       {/* Tabs */}
       <div className="profile-tabs">
-        <button className="profile-tab active">My Recipes</button>
-        <button className="profile-tab" disabled title="Coming soon: View your saved recipes">Saved <span style={{opacity: 0.7, fontSize: '0.75rem', marginLeft: '0.25rem'}}>(Coming soon)</span></button>
+        <button 
+          className={`profile-tab ${activeProfileTab === "recipes" ? "active" : ""}`}
+          onClick={() => setActiveProfileTab("recipes")}
+        >
+          My Recipes
+        </button>
+        <button 
+          className={`profile-tab ${activeProfileTab === "saved" ? "active" : ""}`}
+          onClick={() => setActiveProfileTab("saved")}
+        >
+          Saved
+        </button>
       </div>
 
       {/* Settings Section */}
@@ -375,6 +404,9 @@ function UserProfile() {
             <HelpCircle className="settings-icon" />
             <span>Help</span>
           </button>
+          <div className="settings-item language-switcher-item">
+            <LanguageSwitcher />
+          </div>
           <button 
             className="settings-item" 
             onClick={toggleTheme}
@@ -405,23 +437,61 @@ function UserProfile() {
 
       {/* Posts Section */}
       <div className="profile-posts">
-        {userPosts.length === 0 ? (
-          <div className="empty-state">
-            <BookOpen className="empty-icon" />
-            <h3>No recipes shared yet</h3>
-            <p>Start converting and sharing recipes to build your profile!</p>
-          </div>
+        {activeProfileTab === "recipes" ? (
+          userPosts.length === 0 ? (
+            <div className="empty-state">
+              <BookOpen className="empty-icon" />
+              <h3>No recipes shared yet</h3>
+              <p>Start converting and sharing recipes to build your profile!</p>
+            </div>
+          ) : (
+            <div className="posts-list">
+              {userPosts.map((post) => (
+                <RecipePost
+                  key={post.id}
+                  post={post}
+                  onLike={handleLike}
+                  onSave={handleSave}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div className="posts-list">
-            {userPosts.map((post) => (
-              <RecipePost
-                key={post.id}
-                post={post}
-                onLike={handleLike}
-                onSave={handleSave}
-              />
-            ))}
-          </div>
+          savedRecipes.length === 0 ? (
+            <div className="empty-state">
+              <Heart className="empty-icon" />
+              <h3>No saved recipes yet</h3>
+              <p>Save recipes from the Convert tab to view them here!</p>
+            </div>
+          ) : (
+            <div className="posts-list">
+              {savedRecipes.map((recipe) => (
+                <div key={recipe.id || recipe.title} className="saved-recipe-card">
+                  <h4>{recipe.title || "Untitled Recipe"}</h4>
+                  <p className="saved-recipe-preview">
+                    {recipe.originalText ? recipe.originalText.substring(0, 150) + "..." : "No preview available"}
+                  </p>
+                  <button
+                    className="load-recipe-btn"
+                    onClick={() => {
+                      // Load recipe into converter
+                      window.dispatchEvent(new CustomEvent("loadRecipe", { 
+                        detail: { 
+                          recipe: recipe.originalText || recipe.originalRecipe || "",
+                          converted: recipe.convertedText || recipe.convertedRecipe || "",
+                          issues: recipe.issues || []
+                        } 
+                      }));
+                      // Switch to convert tab
+                      window.dispatchEvent(new CustomEvent("switchTab", { detail: { tab: "convert" } }));
+                    }}
+                  >
+                    Load Recipe
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 

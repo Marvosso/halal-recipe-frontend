@@ -11,7 +11,6 @@ import QuickLookup from "./components/QuickLookup";
 import IngredientTreeDisplay from "./components/IngredientTreeDisplay";
 import HalalStandardPanel from "./components/HalalStandardPanel";
 import CommunityTips from "./components/CommunityTips";
-import LanguageSwitcher from "./components/LanguageSwitcher";
 import TabNavigation from "./components/TabNavigation";
 import SocialFeed from "./components/SocialFeed";
 import UserProfile from "./components/UserProfile";
@@ -986,7 +985,6 @@ Instructions:
             <img src={halalArabicImage} alt="Halal" className="halal-arabic" />
             <div className="header-actions">
               <HalalStandardPanel onSettingsChange={setHalalSettings} />
-              <LanguageSwitcher />
             </div>
           </div>
           <h1>
@@ -1458,7 +1456,6 @@ Instructions:
       <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
       <footer className="app-footer">
-        <LanguageSwitcher />
         <p className="footer-text">© {new Date().getFullYear()} Halal Kitchen. Providing halal recipe conversion guidance.</p>
       </footer>
     </div>
