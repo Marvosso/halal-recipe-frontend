@@ -10,7 +10,6 @@ function QuickLookup({ onConvertClick }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [simpleExplanationEnabled, setSimpleExplanationEnabled] = useState(false);
 
   // Hardcoded lookup data for common ingredients
   // In production, this would come from the backend
@@ -95,13 +94,6 @@ function QuickLookup({ onConvertClick }) {
     }
   };
 
-  // Load ELI5 preference from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("simpleExplanationEnabled");
-    if (saved !== null) {
-      setSimpleExplanationEnabled(saved === "true");
-    }
-  }, []);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -306,38 +298,19 @@ function QuickLookup({ onConvertClick }) {
           </div>
           
           <div className="result-content">
-            {/* ELI5 Toggle */}
-            <div className="quick-lookup-eli5-toggle">
-              <SimpleExplanationToggle
-                onToggle={setSimpleExplanationEnabled}
-                defaultEnabled={simpleExplanationEnabled}
-              />
-            </div>
-            
-            {/* Explanation - Show ELI5 if enabled, full explanation if disabled */}
-            {simpleExplanationEnabled ? (
-              // Show simple explanation when ELI5 toggle is ON
-              (result.simpleExplanation || result.eli5) ? (
-                <div className="eli5-section">
-                  <p className="eli5-text">
-                    <strong>In simple terms:</strong> {result.simpleExplanation || result.eli5}
-                  </p>
-                </div>
-              ) : (
-                // Fallback if simpleExplanation is missing
-                <div className="eli5-section">
-                  <p className="eli5-text">
-                    <strong>In simple terms:</strong> this ingredient is not halal and needs a replacement.
-                  </p>
-                </div>
-              )
+            {/* Always show simple explanation (ELI5 style) for Quick Lookup */}
+            {(result.simpleExplanation || result.eli5) ? (
+              <div className="eli5-section">
+                <p className="eli5-text">
+                  <strong>In simple terms:</strong> {result.simpleExplanation || result.eli5}
+                </p>
+              </div>
             ) : (
-              // Show full explanation when ELI5 toggle is OFF
-              <div className="result-explanation-section">
-                <p className="result-explanation">{result.explanation || result.notes || "No explanation available."}</p>
-                {result.notes && result.notes !== result.explanation && (
-                  <p className="result-notes">{result.notes}</p>
-                )}
+              // Fallback if simpleExplanation is missing
+              <div className="eli5-section">
+                <p className="eli5-text">
+                  <strong>In simple terms:</strong> this ingredient is not halal and needs a replacement.
+                </p>
               </div>
             )}
             

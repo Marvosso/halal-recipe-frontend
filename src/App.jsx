@@ -7,7 +7,6 @@ import halalOutputIcon from "./assets/halal-output.png";
 import halalSavedIcon from "./assets/halal-saved.png";
 import { RefreshCw, ClipboardCopy, Download, Bookmark, Star, ThumbsUp, ThumbsDown, Play, Share2 } from "lucide-react";
 import HaramIngredient from "./components/HaramIngredient";
-import SimpleExplanationToggle from "./components/SimpleExplanationToggle";
 import QuickLookup from "./components/QuickLookup";
 import IngredientTreeDisplay from "./components/IngredientTreeDisplay";
 import HalalStandardPanel from "./components/HalalStandardPanel";
@@ -41,7 +40,6 @@ function App() {
   const [savedRecipes, setSavedRecipes] = useState([]);
   const [publicRecipes, setPublicRecipes] = useState([]);
   const [viewingRecipe, setViewingRecipe] = useState(null);
-  const [simpleExplanationEnabled, setSimpleExplanationEnabled] = useState(false);
   const [halalSettings, setHalalSettings] = useState({
     strictnessLevel: "standard",
     schoolOfThought: "no-preference"
@@ -715,7 +713,7 @@ function App() {
             name={haramData.name}
             quranRef={haramData.quranRef}
             hadithRef={haramData.hadithRef}
-            useSimpleExplanation={simpleExplanationEnabled}
+            useSimpleExplanation={false}
           />
         );
       } else {
@@ -1169,15 +1167,6 @@ Instructions:
                   </div>
                   
                   {isAccordionOpen && (
-                    <div className="simple-explanation-toggle-wrapper">
-                      <SimpleExplanationToggle
-                        onToggle={setSimpleExplanationEnabled}
-                        defaultEnabled={simpleExplanationEnabled}
-                      />
-                    </div>
-                  )}
-
-                  {isAccordionOpen && (
                     <div className="accordion-content">
                       {safeIssues.length > 0 ? (
                         <div className="ingredient-cards">
@@ -1305,36 +1294,15 @@ Instructions:
                                       </div>
                                     )}
                                     
-                                    {/* ELI5 from Knowledge Model - Show based on toggle */}
-                                    {simpleExplanationEnabled ? (
-                                      // Show simple explanation when ELI5 toggle is ON
-                                      (issue?.simpleExplanation || issue?.eli5) ? (
-                                        <div className="ingredient-detail-row">
-                                          <span className="detail-label">Simple Explanation:</span>
-                                          <span className="detail-value eli5-value">
-                                            {issue.simpleExplanation || issue.eli5}
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        // Fallback if simpleExplanation is missing
-                                        <div className="ingredient-detail-row">
-                                          <span className="detail-label">Simple Explanation:</span>
-                                          <span className="detail-value eli5-value">
-                                            In simple terms: this ingredient is not halal and needs a replacement.
-                                          </span>
-                                        </div>
-                                      )
-                                    ) : (
-                                      // Show full explanation when ELI5 toggle is OFF
-                                      (issue?.explanation || issue?.notes) ? (
-                                        <div className="ingredient-detail-row">
-                                          <span className="detail-label">Explanation:</span>
-                                          <span className="detail-value">
-                                            {issue.explanation || issue.notes}
-                                          </span>
-                                        </div>
-                                      ) : null
-                                    )}
+                                    {/* Explanation from Knowledge Model - Always show detailed explanation with Islamic references */}
+                                    {(issue?.explanation || issue?.notes) ? (
+                                      <div className="ingredient-detail-row">
+                                        <span className="detail-label">Explanation:</span>
+                                        <span className="detail-value">
+                                          {issue.explanation || issue.notes}
+                                        </span>
+                                      </div>
+                                    ) : null}
                                     
                                     {/* Derived Ingredient Warning */}
                                     {issue?.trace && Array.isArray(issue.trace) && issue.trace.length > 1 && (
