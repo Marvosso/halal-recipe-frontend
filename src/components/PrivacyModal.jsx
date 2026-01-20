@@ -60,7 +60,7 @@ function PrivacyModal({ isOpen, onClose }) {
             <li>Language preference</li>
             <li>Theme preference (light/dark mode)</li>
             <li>Notification settings</li>
-            <li>Profile information (display name, bio, avatar color)</li>
+            <li>Profile information (display name, bio)</li>
           </ul>
           <p className="privacy-note">
             You can clear all this data anytime by clearing your browser's local storage.
