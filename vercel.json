@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/googlea841887287663150.html",
+      "destination": "/googlea841887287663150.html"
+    },
+    {
       "source": "/((?!sitemap\\.xml|robots\\.txt|googlea841887287663150\\.html|.*\\.(xml|txt|html|ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|css|js|json|map)).*)",
       "destination": "/index.html"
     }
@@ -33,7 +37,11 @@
       "headers": [
         {
           "key": "Content-Type",
-          "value": "text/html; charset=utf-8"
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
         }
       ]
     }
