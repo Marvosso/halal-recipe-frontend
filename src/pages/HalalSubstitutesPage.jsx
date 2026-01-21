@@ -13,7 +13,7 @@ function HalalSubstitutesPage() {
           content="Complete guide to halal substitutes for common non-halal ingredients. Learn how to replace pork, alcohol, gelatin, and more in your recipes." 
         />
         <meta name="keywords" content="halal substitutes, halal alternatives, pork substitute, alcohol substitute, halal cooking tips" />
-        <link rel="canonical" href="https://halalkitchen.com/halal-substitutes" />
+        <link rel="canonical" href="https://halalkitchen.app/halal-substitutes" />
       </Helmet>
       
       <main className="seo-page">

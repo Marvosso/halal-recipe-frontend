@@ -14,7 +14,7 @@ function IsGelatinHalalPage() {
           content="Is gelatin halal? Learn about the Islamic ruling on gelatin, why it's typically haram, and discover halal alternatives like agar agar. Complete guide with Quran and Hadith references." 
         />
         <meta name="keywords" content="is gelatin halal, gelatin haram, halal gelatin, agar agar, halal alternatives, Islamic dietary laws" />
-        <link rel="canonical" href="https://halalkitchen.com/is-gelatin-halal" />
+        <link rel="canonical" href="https://halalkitchen.app/is-gelatin-halal" />
       </Helmet>
 
       <div className="seo-page-wrapper">

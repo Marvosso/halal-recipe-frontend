@@ -13,7 +13,7 @@ function IsItHalalPage() {
           content="Quick reference guide to determine if ingredients are halal. Learn about pork, alcohol, gelatin, vanilla extract, and more. Check ingredients before cooking." 
         />
         <meta name="keywords" content="is it halal, halal ingredients, haram ingredients, halal food guide, Islamic dietary laws" />
-        <link rel="canonical" href="https://halalkitchen.com/is-it-halal" />
+        <link rel="canonical" href="https://halalkitchen.app/is-it-halal" />
       </Helmet>
       
       <main className="seo-page">

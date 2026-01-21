@@ -14,7 +14,7 @@ function IsBaconHalalPage() {
           content="Is bacon halal? Bacon is haram (forbidden) in Islam because it's made from pork. Learn about the Islamic ruling and discover halal alternatives like turkey bacon and beef bacon." 
         />
         <meta name="keywords" content="is bacon halal, bacon haram, halal bacon, turkey bacon, beef bacon, halal alternatives, Islamic dietary laws" />
-        <link rel="canonical" href="https://halalkitchen.com/is-bacon-halal" />
+        <link rel="canonical" href="https://halalkitchen.app/is-bacon-halal" />
       </Helmet>
 
       <div className="seo-page-wrapper">

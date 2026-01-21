@@ -14,7 +14,7 @@ function IsWineVinegarHalalPage() {
           content="Is wine vinegar halal? Wine vinegar is generally considered halal after full fermentation transforms alcohol into acetic acid. Learn about the Islamic ruling and halal alternatives." 
         />
         <meta name="keywords" content="is wine vinegar halal, wine vinegar, red wine vinegar, white wine vinegar, halal vinegar, Islamic dietary laws" />
-        <link rel="canonical" href="https://halalkitchen.com/is-wine-vinegar-halal" />
+        <link rel="canonical" href="https://halalkitchen.app/is-wine-vinegar-halal" />
       </Helmet>
 
       <div className="seo-page-wrapper">

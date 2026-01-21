@@ -14,7 +14,7 @@ function IsVanillaExtractHalalPage() {
           content="Is vanilla extract halal? Vanilla extract contains alcohol, making it disputed among scholars. Learn about the Islamic ruling and discover alcohol-free halal alternatives." 
         />
         <meta name="keywords" content="is vanilla extract halal, vanilla extract alcohol, halal vanilla extract, alcohol-free vanilla, Islamic dietary laws" />
-        <link rel="canonical" href="https://halalkitchen.com/is-vanilla-extract-halal" />
+        <link rel="canonical" href="https://halalkitchen.app/is-vanilla-extract-halal" />
       </Helmet>
 
       <div className="seo-page-wrapper">

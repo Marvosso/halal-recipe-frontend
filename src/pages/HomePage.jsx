@@ -13,7 +13,7 @@ function HomePage() {
           content="Convert any recipe to halal-compliant with our free AI-powered recipe converter. Get halal substitutes, Islamic dietary guidance, and confidence scores. Start converting recipes today!" 
         />
         <meta name="keywords" content="halal recipe converter, halal food, halal substitutes, Islamic cooking, halal ingredients, recipe conversion" />
-        <link rel="canonical" href="https://halalkitchen.com/" />
+        <link rel="canonical" href="https://halalkitchen.app/" />
       </Helmet>
       
       <main className="seo-page">

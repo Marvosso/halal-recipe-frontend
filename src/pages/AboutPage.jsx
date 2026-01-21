@@ -13,7 +13,7 @@ function AboutPage() {
           content="Learn about Halal Kitchen's mission to make halal cooking accessible to everyone. Free recipe conversion tool with Islamic dietary guidance." 
         />
         <meta name="keywords" content="about halal kitchen, halal cooking mission, Islamic dietary guidance, halal food community" />
-        <link rel="canonical" href="https://halalkitchen.com/about" />
+        <link rel="canonical" href="https://halalkitchen.app/about" />
       </Helmet>
       
       <main className="seo-page">

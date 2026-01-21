@@ -9,4 +9,4 @@ Allow: /about
 Disallow: /api/
 Disallow: /admin/
 
-Sitemap: https://halalkitchen.com/sitemap.xml
+Sitemap: https://halalkitchen.app/sitemap.xml

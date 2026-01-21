@@ -13,7 +13,7 @@ function HowItWorksPage() {
           content="Learn how Halal Kitchen's recipe converter works. Understand our AI-powered ingredient analysis, halal substitution process, and confidence scoring system." 
         />
         <meta name="keywords" content="how halal converter works, recipe conversion process, halal AI, ingredient analysis" />
-        <link rel="canonical" href="https://halalkitchen.com/how-it-works" />
+        <link rel="canonical" href="https://halalkitchen.app/how-it-works" />
       </Helmet>
       
       <main className="seo-page">
