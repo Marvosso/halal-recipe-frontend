@@ -160,6 +160,39 @@
   transform: translateY(-2px);
 }
 
+.seo-page-wrapper {
+  min-height: 100vh;
+  background: var(--bg-color);
+}
+
+.seo-nav {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.seo-nav-link {
+  color: var(--primary-green);
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  font-family: "Inter", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.seo-nav-link:hover {
+  background: var(--green-bg);
+  border-color: var(--primary-green);
+  transform: translateY(-2px);
+}
+
 /* Dark mode support */
 [data-theme="dark"] .seo-page {
   background: var(--bg-color);

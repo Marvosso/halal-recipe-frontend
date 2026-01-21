@@ -68,6 +68,7 @@ function QuickLookup({ onConvertClick }) {
     }
   };
 
+
   // Existing lookup logic (preserved as fallback)
   const existingLookupLogic = (searchInput) => {
     const normalizedTerm = searchInput.toLowerCase().trim();
@@ -94,8 +95,10 @@ function QuickLookup({ onConvertClick }) {
   };
 
 
-  const handleSearch = async () => {
-    if (!searchTerm.trim()) {
+  // Internal search function that accepts a term parameter
+  const performSearch = async (termToSearch = null) => {
+    const searchValue = termToSearch || searchTerm;
+    if (!searchValue || !searchValue.trim()) {
       setResult(null);
       return;
     }
@@ -108,7 +111,7 @@ function QuickLookup({ onConvertClick }) {
       
       if (FEATURES.HALAL_KNOWLEDGE_ENGINE) {
         // Use shared evaluateItem() from halalEngine - same function used everywhere
-        const normalizedTerm = searchTerm.toLowerCase().trim().replace(/\s+/g, "_");
+        const normalizedTerm = searchValue.toLowerCase().trim().replace(/\s+/g, "_");
         const hkmResult = evaluateItem(normalizedTerm);
         
         // Use HKM result (including unknown) - evaluateItem is the single source of truth
@@ -201,13 +204,37 @@ function QuickLookup({ onConvertClick }) {
         };
       } else {
         // Use existing lookup logic when feature flag is off
-        result = existingLookupLogic(searchTerm);
+        result = existingLookupLogic(searchValue);
       }
       
       setResult(result);
       setIsLoading(false);
     }, 300);
   };
+
+  // Public handleSearch function that uses current searchTerm state
+  const handleSearch = async () => {
+    await performSearch();
+  };
+
+  // Listen for pre-fill events from SEO pages (after performSearch is defined)
+  useEffect(() => {
+    const handlePrefillSearch = (e) => {
+      const ingredient = e.detail?.ingredient;
+      if (ingredient) {
+        setSearchTerm(ingredient);
+        // Auto-trigger search after a short delay to ensure state is set
+        setTimeout(() => {
+          performSearch(ingredient);
+        }, 100);
+      }
+    };
+
+    window.addEventListener("prefillQuickLookup", handlePrefillSearch);
+    return () => {
+      window.removeEventListener("prefillQuickLookup", handlePrefillSearch);
+    };
+  }, []); // Empty deps - performSearch is stable
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
