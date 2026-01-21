@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/((?!sitemap\\.xml|robots\\.txt|.*\\.(xml|txt|ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|css|js|json|map)).*)",
+      "source": "/((?!sitemap\\.xml|robots\\.txt|googlea841887287663150\\.html|.*\\.(xml|txt|html|ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|css|js|json|map)).*)",
       "destination": "/index.html"
     }
   ],
@@ -25,6 +25,15 @@
         {
           "key": "Content-Type",
           "value": "text/plain; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "/googlea841887287663150.html",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=utf-8"
         }
       ]
     }
