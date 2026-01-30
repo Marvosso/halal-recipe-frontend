@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Settings, X } from "lucide-react";
 import "./HalalStandardPanel.css";
 
@@ -24,22 +25,22 @@ function HalalStandardPanel({ onSettingsChange }) {
   useEffect(() => {
     if (isOpen) {
       const originalOverflow = document.body.style.overflow;
-      const originalPosition = document.body.style.position;
-      const originalWidth = document.body.style.width;
-      const scrollY = window.scrollY;
       
-      // Prevent background scrolling
+      // Prevent background scrolling (simpler approach like ProfileModal)
       document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.width = "100%";
-      document.body.style.top = `-${scrollY}px`;
+      
+      // Handle ESC key
+      const handleEscape = (e) => {
+        if (e.key === "Escape") {
+          setIsOpen(false);
+        }
+      };
+      document.addEventListener("keydown", handleEscape);
       
       return () => {
         // Restore scrolling when modal closes
         document.body.style.overflow = originalOverflow;
-        document.body.style.position = originalPosition;
-        document.body.style.width = originalWidth;
-        window.scrollTo(0, scrollY);
+        document.removeEventListener("keydown", handleEscape);
       };
     }
   }, [isOpen]);
@@ -84,8 +85,14 @@ function HalalStandardPanel({ onSettingsChange }) {
         <span>My Halal Standard</span>
       </button>
 
-      {isOpen && (
-        <div className="settings-overlay" onClick={() => setIsOpen(false)}>
+      {isOpen && typeof document !== 'undefined' && document.body && createPortal(
+        <div 
+          className="settings-overlay" 
+          onClick={() => setIsOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Halal Standard Settings"
+        >
           <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
             <div className="settings-header">
               <h2>My Halal Standard</h2>
@@ -199,7 +206,8 @@ function HalalStandardPanel({ onSettingsChange }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

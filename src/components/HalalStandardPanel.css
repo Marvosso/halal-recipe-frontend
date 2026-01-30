@@ -43,11 +43,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 99999;
   padding: 1rem;
   animation: fadeIn 0.3s ease;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
+  isolation: isolate;
 }
 
 .settings-panel {
@@ -62,7 +64,9 @@
   animation: slideUp 0.3s ease;
   margin: auto;
   position: relative;
+  z-index: 1;
   -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
 }
 
 @keyframes fadeIn {
