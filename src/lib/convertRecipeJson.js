@@ -12,6 +12,7 @@ import { evaluateItem } from "./halalEngine";
 import { FEATURES } from "./featureFlags";
 import halalKnowledge from "../data/halal_knowledge.json";
 import { formatIngredientName } from "./ingredientDisplay";
+import { getAffiliateLinksForSubstitutes, buildAffiliateUrl } from "./affiliateService";
 
 /**
  * Normalize ingredient name for lookup
@@ -304,10 +305,12 @@ function calculateConfidenceScore({ originalIngredients, replacements, unresolve
 /**
  * Main conversion function using JSON knowledge engine
  * 
- * PIPELINE: Detect → Convert → Calculate Score
+ * PIPELINE: Detect → Convert → Fetch Affiliate Links → Calculate Score
  * Each step is independent and runs fully regardless of previous step results
+ * 
+ * MONETIZATION: Affiliate links are ONLY attached to halal substitutes, NEVER to haram ingredients
  */
-export function convertRecipeWithJson(recipeText, userPreferences = {}) {
+export async function convertRecipeWithJson(recipeText, userPreferences = {}) {
   // Defensive checks
   if (!recipeText || typeof recipeText !== "string") {
     return {
@@ -349,6 +352,32 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
     console.log("[CONVERSION DEBUG] Replacements:", replacements.length);
     console.log("[CONVERSION DEBUG] Unresolved:", unresolved.length);
     
+    // STEP 2.5: FETCH AFFILIATE LINKS for substitutes (monetization)
+    // CRITICAL: ONLY fetch links for halal substitutes, NEVER for haram ingredients
+    const substituteIds = detectedIngredients
+      .filter(item => {
+        const replacementId = item.replacement_id || item.replacement;
+        return replacementId && 
+               replacementId !== "Halal alternative needed" && 
+               replacementId.trim() !== "";
+      })
+      .map(item => item.replacement_id || item.replacement)
+      .filter((id, index, self) => self.indexOf(id) === index); // Unique IDs only
+    
+    // Also include all alternatives (for showing 1-3 substitutes)
+    const allAlternativeIds = detectedIngredients
+      .flatMap(item => item.alternatives || [])
+      .filter((id, index, self) => self.indexOf(id) === index);
+    
+    const allSubstituteIds = [...new Set([...substituteIds, ...allAlternativeIds])];
+    
+    // Fetch affiliate links (limit to 3 per substitute)
+    const affiliateLinksMap = await getAffiliateLinksForSubstitutes(
+      allSubstituteIds, 
+      'US', // TODO: Get from user preferences or geolocation
+      3 // Max 3 links per substitute
+    );
+    
     // STEP 3: CALCULATE confidence score (pure scoring, uses FINAL conversion state)
     // Scoring happens AFTER all replacements are complete
     const confidenceScore = calculateConfidenceScore({
@@ -360,7 +389,7 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
     // Check if any substitutions occurred (for confidence_type classification)
     const hasSubstitutions = convertedText !== trimmedText;
     
-    // STEP 4: Format issues for UI (using ingredient IDs)
+    // STEP 4: Format issues with affiliate links (ONLY on substitutes, NEVER on haram ingredients)
     // Include both replaced and unresolved ingredients in issues list
     const issues = detectedIngredients.map((item) => {
       const references = [];
@@ -381,26 +410,104 @@ export function convertRecipeWithJson(recipeText, userPreferences = {}) {
                 ? Math.round(item.engineResult.confidence * 100)
                 : undefined));
       
+      // Get replacement ID for affiliate link lookup
+      const replacementId = item.replacement_id || item.replacement;
+      
+      // CRITICAL: Only attach affiliate links to SUBSTITUTES, NEVER to haram ingredients
+      // Fetch affiliate links for the primary replacement (if it exists and is valid)
+      let substituteAffiliateLinks = [];
+      if (replacementId && 
+          replacementId !== "Halal alternative needed" && 
+          replacementId.trim() !== "" &&
+          affiliateLinksMap[replacementId]) {
+        // Get affiliate links for this substitute (limit to 1-3)
+        const links = affiliateLinksMap[replacementId].slice(0, 3);
+        substituteAffiliateLinks = links.map(link => ({
+          id: link.id,
+          platform: link.platform.name,
+          platform_display: link.platform.display_name,
+          platform_color: link.platform.color_hex,
+          url: buildAffiliateUrl(link),
+          search_query: link.search_query,
+          is_featured: link.is_featured || false
+        }));
+      }
+      
+      // Build clear explanation for why ingredient is haram
+      // Priority: explanation > eli5 > simpleExplanation > notes
+      let haramExplanation = "";
+      if (item.engineResult?.explanation) {
+        haramExplanation = item.engineResult.explanation;
+      } else if (item.engineResult?.eli5) {
+        haramExplanation = item.engineResult.eli5;
+      } else if (item.engineResult?.simpleExplanation) {
+        haramExplanation = item.engineResult.simpleExplanation;
+      } else if (item.engineResult?.notes) {
+        haramExplanation = item.engineResult.notes;
+      } else {
+        // Fallback explanation based on status
+        if (item.status === "haram") {
+          haramExplanation = "This ingredient is prohibited (haram) in Islam. " +
+            (item.quranReference ? `See ${item.quranReference}. ` : "") +
+            (item.hadithReference ? `See ${item.hadithReference}.` : "");
+        } else if (item.status === "conditional") {
+          haramExplanation = "This ingredient may be halal under certain conditions. " +
+            "Please verify with a qualified Islamic scholar.";
+        }
+      }
+      
+      // Get 1-3 halal substitutes with affiliate links
+      const allAlternatives = item.alternatives || [];
+      const substitutesWithLinks = allAlternatives
+        .slice(0, 3) // Limit to 3 substitutes
+        .map(altId => {
+          const altLinks = affiliateLinksMap[altId] || [];
+          return {
+            id: altId,
+            name: formatIngredientName(altId),
+            affiliate_links: altLinks.slice(0, 3).map(link => ({
+              id: link.id,
+              platform: link.platform.name,
+              platform_display: link.platform.display_name,
+              platform_color: link.platform.color_hex,
+              url: buildAffiliateUrl(link),
+              search_query: link.search_query,
+              is_featured: link.is_featured || false
+            }))
+          };
+        });
+      
       return {
         ingredient_id: item.ingredient_id || item.ingredient, // Internal ID
         ingredient: item.ingredient_id || item.ingredient, // Keep for backward compatibility
-        replacement_id: item.replacement_id || item.replacement, // Replacement ID
-        replacement: item.replacement_id || item.replacement, // Keep for backward compatibility
+        replacement_id: replacementId, // Replacement ID
+        replacement: replacementId, // Keep for backward compatibility
+        
+        // MONETIZATION: Affiliate links ONLY on substitutes
+        // NEVER attach affiliate links to haram ingredients themselves
+        substitute_affiliate_links: substituteAffiliateLinks, // Links for primary replacement
+        substitutes_with_links: substitutesWithLinks, // All alternatives with links (1-3)
+        
         // Replacement ratio and culinary notes
         replacementRatio: item.replacementRatio || item.engineResult?.replacementRatio || null,
         culinaryNotes: item.culinaryNotes || item.engineResult?.culinaryNotes || null,
+        
+        // Clear explanation for why ingredient is haram
+        haram_explanation: haramExplanation, // Clear, religious justification
+        explanation: haramExplanation, // Backward compatibility
+        
         severity: item.severity,
         confidence: issueConfidenceScore ? issueConfidenceScore / 100 : undefined, // 0-1 format for backward compatibility
         confidenceScore: issueConfidenceScore, // PRIMARY: 0-100 format
         quranReference: item.quranReference,
         hadithReference: item.hadithReference,
         references: references,
+        
         // Add knowledge engine fields
         inheritedFrom: item.engineResult?.inheritedFrom,
-        alternatives: item.alternatives,
+        alternatives: allAlternatives, // All alternatives (for display)
         eli5: item.engineResult?.eli5 || item.engineResult?.simpleExplanation,
         simpleExplanation: item.engineResult?.simpleExplanation || item.engineResult?.eli5,
-        explanation: item.engineResult?.explanation || "", // Religious justification only
         trace: item.engineResult?.trace || [],
         tags: item.engineResult?.tags,
         hkmResult: item.engineResult,

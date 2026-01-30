@@ -1344,6 +1344,13 @@ html {
   font-family: "Inter", sans-serif;
 }
 
+.detail-value-with-shop {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .detail-value {
   color: var(--text-primary);
   font-size: 1.0625rem;

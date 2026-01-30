@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Search, RefreshCw } from "lucide-react";
+import AffiliateLink from "./AffiliateLink";
 import "./SEOPageLayout.css";
 
 /**
@@ -190,6 +191,18 @@ function SEOPageLayout({
                   {alternative.notes && (
                     <p className="alternative-notes">{alternative.notes}</p>
                   )}
+                  <div className="alternative-shop-links">
+                    <AffiliateLink
+                      ingredientName={alternative.name}
+                      platform="amazon"
+                      variant="link"
+                    />
+                    <AffiliateLink
+                      ingredientName={alternative.name}
+                      platform="instacart"
+                      variant="link"
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

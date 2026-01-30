@@ -12,6 +12,9 @@ import IngredientTreeDisplay from "./components/IngredientTreeDisplay";
 import HalalStandardPanel from "./components/HalalStandardPanel";
 import CommunityTips from "./components/CommunityTips";
 import TabNavigation from "./components/TabNavigation";
+import IngredientShopSection from "./components/IngredientShopSection";
+import AffiliateLink from "./components/AffiliateLink";
+import AffiliateLinkGroup from "./components/AffiliateLinkGroup";
 import SocialFeed from "./components/SocialFeed";
 import UserProfile from "./components/UserProfile";
 import CreatePostModal from "./components/CreatePostModal";
@@ -227,7 +230,7 @@ function App() {
       // Use JSON engine as primary conversion source if enabled
       if (FEATURES.USE_JSON_CONVERSION_PRIMARY && FEATURES.HALAL_KNOWLEDGE_ENGINE) {
         try {
-          const jsonResult = convertRecipeWithJson(trimmedRecipe, halalSettings);
+          const jsonResult = await convertRecipeWithJson(trimmedRecipe, halalSettings);
           convertedText = jsonResult.convertedText || "";
           convertedIssues = Array.isArray(jsonResult.issues) ? jsonResult.issues : [];
           // Ensure confidenceScore is never 0 unless truly 0
@@ -1121,6 +1124,17 @@ Instructions:
                   </div>
                 </div>
 
+                {/* Shop Ingredients Section - Only shows for replaced ingredients */}
+                {safeIssues && safeIssues.length > 0 && (
+                  <IngredientShopSection 
+                    replacements={safeIssues.filter(issue => 
+                      issue?.wasReplaced && 
+                      issue?.replacement_id && 
+                      issue.replacement_id !== "Halal alternative needed"
+                    )}
+                  />
+                )}
+
                 <div className="confidence-section">
                   <div className="confidence-header">
                     <h3>
@@ -1224,8 +1238,25 @@ Instructions:
                                     </div>
                                     <div className="ingredient-detail-row">
                                       <span className="detail-label">Halal Replacement:</span>
-                                      <span className="detail-value">{formatIngredientName(issue?.replacement_id || issue?.replacement || "—")}</span>
+                                      <div className="detail-value-with-shop">
+                                        <span className="detail-value">{formatIngredientName(issue?.replacement_id || issue?.replacement || "—")}</span>
+                                      </div>
                                     </div>
+                                    
+                                    {/* Affiliate Links for Substitute (ONLY on substitute, NEVER on haram ingredient) */}
+                                    {issue?.substitute_affiliate_links && 
+                                     issue.substitute_affiliate_links.length > 0 && 
+                                     issue?.replacement_id && 
+                                     issue.replacement_id !== "Halal alternative needed" && (
+                                      <div className="ingredient-detail-row">
+                                        <AffiliateLinkGroup
+                                          affiliateLinks={issue.substitute_affiliate_links}
+                                          ingredientName={formatIngredientName(issue.replacement_id || issue.replacement)}
+                                          variant="card"
+                                          showDisclosure={true}
+                                        />
+                                      </div>
+                                    )}
                                     
                                     {/* Replacement Ratio - Display clearly under replacement ingredient */}
                                     {issue?.replacementRatio && (
