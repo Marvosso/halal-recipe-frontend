@@ -13,7 +13,7 @@
       "destination": "/googlea841887287663150.html"
     },
     {
-      "source": "/((?!sitemap\\.xml|robots\\.txt|googlea841887287663150\\.html|.*\\.(xml|txt|html|ico|png|jpg|jpeg|gif|svg|webp|woff|woff2|ttf|eot|css|js|json|map)).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
