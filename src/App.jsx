@@ -28,7 +28,7 @@ import { convertRecipeWithJson } from "./lib/convertRecipeJson";
 import { formatIngredientName } from "./lib/ingredientDisplay";
 import { isPremiumUser, canConvert, getRemainingConversionsThisMonth, getConversionsThisMonth, trackConversion } from "./lib/subscription";
 import { checkConversionLimit, canUseAdvancedSubstitutions, canUseStrictHalalMode, canExportShoppingList } from "./lib/featureGating";
-import { trackConversionLimitHit, trackUpgradeModalView, trackUpgradeAttempt } from "./lib/premiumAnalytics";
+import { trackConversionLimitHit, trackUpgradeModalView, trackUpgradeAttempt, trackConversionLimitApproach } from "./lib/premiumAnalytics";
 import { isAuthenticated, getUserData, getCurrentUser, clearAuth } from "./api/authApi";
 import UpgradePrompt from "./components/UpgradePrompt";
 import PremiumUpgradeModal from "./components/PremiumUpgradeModal";
@@ -458,7 +458,6 @@ function App() {
       
       // Track conversion limit approach
       if (!isPremiumUser() && conversionResult.remaining <= 2 && conversionResult.remaining > 0) {
-        const { trackConversionLimitApproach } = require("./lib/premiumAnalytics");
         trackConversionLimitApproach(conversionResult.used, conversionResult.limit, conversionResult.remaining);
       }
       
