@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Settings, X } from "lucide-react";
+import { isPremiumUser } from "../lib/subscription";
+import { canUseStrictHalalMode } from "../lib/featureGating";
+import UpgradePrompt from "./UpgradePrompt";
 import "./HalalStandardPanel.css";
 
 function HalalStandardPanel({ onSettingsChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const [strictnessLevel, setStrictnessLevel] = useState("standard");
   const [schoolOfThought, setSchoolOfThought] = useState("no-preference");
+  const [showStrictModeUpgrade, setShowStrictModeUpgrade] = useState(false);
 
   useEffect(() => {
     // Load preferences from localStorage
@@ -46,6 +50,21 @@ function HalalStandardPanel({ onSettingsChange }) {
   }, [isOpen]);
 
   const handleStrictnessChange = (level) => {
+    // Check if strict mode requires premium
+    if (level === "strict" && !isPremiumUser()) {
+      const canUse = canUseStrictHalalMode();
+      if (!canUse) {
+        setShowStrictModeUpgrade(true);
+        return; // Don't change to strict mode
+      }
+    }
+    
+    // Track strict halal mode usage (if premium)
+    if (level === "strict" && isPremiumUser()) {
+      const { trackStrictHalalModeUsage } = require("../lib/premiumAnalytics");
+      trackStrictHalalModeUsage(true);
+    }
+    
     setStrictnessLevel(level);
     localStorage.setItem("halalStrictnessLevel", level);
     if (onSettingsChange) {
@@ -112,18 +131,21 @@ function HalalStandardPanel({ onSettingsChange }) {
                   Choose how strictly you want to follow halal guidelines
                 </p>
                 <div className="radio-group">
-                  <label className="radio-option">
+                  <label className={`radio-option ${!isPremiumUser() && strictnessLevel !== "strict" ? "premium-feature" : ""}`}>
                     <input
                       type="radio"
                       name="strictness"
                       value="strict"
                       checked={strictnessLevel === "strict"}
                       onChange={(e) => handleStrictnessChange(e.target.value)}
+                      disabled={!isPremiumUser() && strictnessLevel !== "strict"}
                     />
                     <div className="radio-content">
-                      <span className="radio-label">Strict</span>
+                      <span className="radio-label">
+                        Strict {!isPremiumUser() && <span className="premium-badge">Premium</span>}
+                      </span>
                       <span className="radio-description">
-                        Avoid all cross-contamination mentions
+                        Avoid all cross-contamination mentions {!isPremiumUser() && "(Premium feature)"}
                       </span>
                     </div>
                   </label>
@@ -208,6 +230,14 @@ function HalalStandardPanel({ onSettingsChange }) {
           </div>
         </div>,
         document.body
+      )}
+
+      {showStrictModeUpgrade && (
+        <UpgradePrompt
+          triggerFeature="strictHalalMode"
+          onClose={() => setShowStrictModeUpgrade(false)}
+          showModal={true}
+        />
       )}
     </>
   );

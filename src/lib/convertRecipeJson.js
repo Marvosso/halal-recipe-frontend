@@ -13,6 +13,7 @@ import { FEATURES } from "./featureFlags";
 import halalKnowledge from "../data/halal_knowledge.json";
 import { formatIngredientName } from "./ingredientDisplay";
 import { getAffiliateLinksForSubstitutes, buildAffiliateUrl } from "./affiliateService";
+import { applySubstitutionLimit, shouldShowAdvancedSubstitutionFeatures } from "./featureGating";
 
 /**
  * Normalize ingredient name for lookup

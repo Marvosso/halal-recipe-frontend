@@ -26,7 +26,12 @@ import { evaluateItem } from "./lib/halalEngine";
 import { FEATURES } from "./lib/featureFlags";
 import { convertRecipeWithJson } from "./lib/convertRecipeJson";
 import { formatIngredientName } from "./lib/ingredientDisplay";
+import { isPremiumUser, canConvert, getRemainingConversionsThisMonth, getConversionsThisMonth, trackConversion } from "./lib/subscription";
+import { checkConversionLimit, canUseAdvancedSubstitutions, canUseStrictHalalMode, canExportShoppingList } from "./lib/featureGating";
+import { trackConversionLimitHit, trackUpgradeModalView, trackUpgradeAttempt } from "./lib/premiumAnalytics";
 import { isAuthenticated, getUserData, getCurrentUser, clearAuth } from "./api/authApi";
+import UpgradePrompt from "./components/UpgradePrompt";
+import PremiumUpgradeModal from "./components/PremiumUpgradeModal";
 import { createRecipe } from "./api/recipesApi";
 
 function App() {
@@ -442,11 +447,20 @@ function App() {
         logger.warn("Failed to cache conversion:", cacheErr);
       }
       
-      // Track conversion
+      // Track conversion (increment counter for free users)
+      const conversionResult = trackConversion();
+      
+      // Track conversion analytics
       analytics.trackConversion({
         hasIssues: convertedIssues.length > 0,
         confidenceScore: convertedConfidence,
       });
+      
+      // Track conversion limit approach
+      if (!isPremiumUser() && conversionResult.remaining <= 2 && conversionResult.remaining > 0) {
+        const { trackConversionLimitApproach } = require("./lib/premiumAnalytics");
+        trackConversionLimitApproach(conversionResult.used, conversionResult.limit, conversionResult.remaining);
+      }
       
       // Reset accordion state when new conversion happens
       setIsAccordionOpen(false);
@@ -1340,6 +1354,25 @@ Instructions:
                                               <li key={idx}>{formatIngredientName(alt)}</li>
                                             ))}
                                           </ul>
+                                          {/* Show upgrade prompt if more alternatives available (free users) */}
+                                          {issue.allAlternatives && 
+                                           issue.allAlternatives.length > issue.alternatives.length && 
+                                           !isPremiumUser() && (
+                                            <div className="alternatives-upgrade-hint">
+                                              <small>
+                                                Showing {issue.alternatives.length} of {issue.allAlternatives.length} alternatives.{" "}
+                                                <button 
+                                                  className="upgrade-hint-link"
+                                                  onClick={() => {
+                                                    setUpgradeTriggerFeature('limitedAlternatives');
+                                                    setShowUpgradeModal(true);
+                                                  }}
+                                                >
+                                                  Upgrade to see all
+                                                </button>
+                                              </small>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     )}
@@ -1511,6 +1544,18 @@ Instructions:
         onClose={() => setShowAuthModal(false)}
         initialMode={authMode}
       />
+
+      {/* Premium Upgrade Modal */}
+      {showUpgradeModal && (
+        <PremiumUpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => {
+            setShowUpgradeModal(false);
+            setUpgradeTriggerFeature(null);
+          }}
+          triggerFeature={upgradeTriggerFeature}
+        />
+      )}
 
       {/* Bottom Navigation */}
       <TabNavigation activeTab={activeTab} onTabChange={handleTabChange} />

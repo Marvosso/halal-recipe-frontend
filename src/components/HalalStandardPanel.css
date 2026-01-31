@@ -192,6 +192,28 @@
   font-weight: 600;
 }
 
+.radio-option.premium-feature {
+  opacity: 0.7;
+  position: relative;
+}
+
+.radio-option.premium-feature input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+.premium-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  background: linear-gradient(135deg, var(--primary-green, #0A9D58) 0%, #08914f 100%);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .radio-option:has(input[type="radio"]:checked) {
   border-color: var(--green-primary, #2E7D32);
   background: var(--green-bg, #e8f5e9);

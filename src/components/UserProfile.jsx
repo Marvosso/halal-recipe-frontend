@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, BookOpen, Heart, Users, Settings, Moon, Sun, Bell, Shield, HelpCircle, LogOut, Camera } from "lucide-react";
+import { User, BookOpen, Heart, Users, Settings, Moon, Sun, Bell, Shield, HelpCircle, LogOut, Camera, CreditCard } from "lucide-react";
 import RecipePost from "./RecipePost";
 import { useTheme } from "../contexts/ThemeContext";
 import HelpModal from "./HelpModal";
@@ -8,6 +8,7 @@ import NotificationsModal from "./NotificationsModal";
 import AccountModal from "./AccountModal";
 import EditProfileModal from "./EditProfileModal";
 import HalalPreferencesModal from "./HalalPreferencesModal";
+import SubscriptionManagement from "./SubscriptionManagement";
 import { getUserData, isAuthenticated, clearAuth } from "../api/authApi";
 import { getProfile } from "../api/profileApi";
 import { getMyRecipes } from "../api/recipesApi";
@@ -27,7 +28,7 @@ function UserProfile() {
   const [userPosts, setUserPosts] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
   const [savedRecipes, setSavedRecipes] = useState([]);
-  const [activeProfileTab, setActiveProfileTab] = useState("recipes"); // "recipes" or "saved"
+  const [activeProfileTab, setActiveProfileTab] = useState("recipes"); // "recipes", "saved", or "subscription"
   const [profile, setProfile] = useState({
     displayName: "",
     bio: "",
@@ -361,6 +362,15 @@ function UserProfile() {
         >
           Saved
         </button>
+        {isAuthenticated() && (
+          <button 
+            className={`profile-tab ${activeProfileTab === "subscription" ? "active" : ""}`}
+            onClick={() => setActiveProfileTab("subscription")}
+          >
+            <CreditCard size={16} />
+            Subscription
+          </button>
+        )}
       </div>
 
       {/* Settings Section */}
@@ -438,7 +448,15 @@ function UserProfile() {
         </div>
       </div>
 
+      {/* Subscription Section */}
+      {activeProfileTab === "subscription" && isAuthenticated() && (
+        <div className="profile-subscription">
+          <SubscriptionManagement />
+        </div>
+      )}
+
       {/* Posts Section */}
+      {activeProfileTab !== "subscription" && (
       <div className="profile-posts">
         {activeProfileTab === "recipes" ? (
           userPosts.length === 0 ? (
@@ -497,6 +515,7 @@ function UserProfile() {
           )
         )}
       </div>
+      )}
 
       {/* Modals */}
       <HelpModal 

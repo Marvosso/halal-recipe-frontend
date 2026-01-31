@@ -1,6 +1,6 @@
 /* Premium Upgrade Modal */
 
-.premium-upgrade-modal-overlay {
+.premium-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -13,6 +13,7 @@
   z-index: 100000;
   padding: 1rem;
   animation: fadeIn 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 @keyframes fadeIn {
@@ -24,7 +25,7 @@
   }
 }
 
-.premium-upgrade-modal {
+.premium-modal {
   background: var(--white, #ffffff);
   border-radius: 16px;
   max-width: 600px;
@@ -34,6 +35,7 @@
   position: relative;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s ease;
+  padding: 2rem;
 }
 
 @keyframes slideUp {
@@ -47,7 +49,7 @@
   }
 }
 
-.premium-upgrade-modal-close {
+.premium-modal-close {
   position: absolute;
   top: 1rem;
   right: 1rem;
@@ -64,21 +66,24 @@
   z-index: 10;
 }
 
-.premium-upgrade-modal-close:hover {
+.premium-modal-close:hover {
   background: var(--bg-secondary, #f8f9fa);
   color: var(--text-primary, #1b5e20);
 }
 
-.premium-upgrade-modal-content {
-  padding: 2rem;
-}
-
-.premium-upgrade-header {
+.premium-modal-header {
   text-align: center;
   margin-bottom: 2rem;
 }
 
-.premium-upgrade-title {
+.premium-modal-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+  color: var(--primary-green, #0A9D58);
+}
+
+.premium-modal-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-primary, #1b5e20);
@@ -86,14 +91,43 @@
   font-family: "Inter", sans-serif;
 }
 
-.premium-upgrade-subtitle {
+.premium-modal-subtitle {
   font-size: 1rem;
   color: var(--text-secondary, #6b7280);
   margin: 0;
   font-family: "Inter", sans-serif;
+  line-height: 1.5;
 }
 
-.premium-upgrade-pricing-toggle {
+.premium-modal-value-prop {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(10, 157, 88, 0.05);
+  border-radius: 10px;
+}
+
+.value-prop-headline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #1b5e20);
+  margin: 0 0 0.5rem 0;
+  font-family: "Inter", sans-serif;
+}
+
+.value-prop-description {
+  font-size: 0.9375rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+  font-family: "Inter", sans-serif;
+}
+
+.premium-modal-pricing {
+  margin-bottom: 2rem;
+}
+
+.pricing-toggle {
   display: flex;
   gap: 0.5rem;
   background: var(--bg-secondary, #f8f9fa);
@@ -102,7 +136,7 @@
   margin-bottom: 1.5rem;
 }
 
-.pricing-toggle-option {
+.pricing-toggle-btn {
   flex: 1;
   padding: 0.75rem 1rem;
   background: transparent;
@@ -117,7 +151,7 @@
   position: relative;
 }
 
-.pricing-toggle-option.active {
+.pricing-toggle-btn.active {
   background: var(--white, #ffffff);
   color: var(--text-primary, #1b5e20);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -167,7 +201,7 @@
   font-family: "Inter", sans-serif;
 }
 
-.premium-upgrade-features {
+.premium-modal-features {
   margin-bottom: 2rem;
 }
 
@@ -241,14 +275,14 @@
   color: var(--primary-green, #0A9D58);
 }
 
-.premium-upgrade-actions {
+.premium-modal-cta {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
 }
 
-.premium-upgrade-cta {
+.premium-upgrade-btn {
   padding: 1rem 2rem;
   border: none;
   border-radius: 10px;
@@ -259,41 +293,92 @@
   transition: all 0.2s ease;
 }
 
-.premium-upgrade-cta.primary {
+.premium-upgrade-btn.primary {
   background: linear-gradient(135deg, var(--primary-green, #0A9D58) 0%, #08914f 100%);
   color: white;
 }
 
-.premium-upgrade-cta.primary:hover {
+.premium-upgrade-btn.primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(10, 157, 88, 0.3);
 }
 
-.premium-upgrade-cta.secondary {
+.premium-upgrade-btn.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.premium-upgrade-btn.secondary {
   background: transparent;
   color: var(--text-primary, #1b5e20);
   border: 2px solid var(--border-light, #e0e0e0);
 }
 
-.premium-upgrade-cta.secondary:hover {
+.premium-upgrade-btn.secondary:hover:not(:disabled) {
   border-color: var(--primary-green, #0A9D58);
   background: rgba(10, 157, 88, 0.05);
 }
 
-.premium-upgrade-trust {
-  text-align: center;
+.premium-upgrade-btn.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.trust-text {
+.premium-modal-trust {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(10, 157, 88, 0.05);
+  border-radius: 10px;
+}
+
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  font-family: "Inter", sans-serif;
+}
+
+.trust-item svg {
+  flex-shrink: 0;
+  color: var(--primary-green, #0A9D58);
+}
+
+.premium-modal-footer {
+  text-align: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-light, #e0e0e0);
+}
+
+.footer-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.5;
+  font-family: "Inter", sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.footer-heart {
+  color: var(--primary-green, #0A9D58);
+}
+
+.footer-thanks {
   font-size: 0.8125rem;
   color: var(--text-secondary, #6b7280);
   margin: 0;
-  line-height: 1.6;
   font-family: "Inter", sans-serif;
 }
 
 /* Dark mode */
-[data-theme="dark"] .premium-upgrade-modal {
+[data-theme="dark"] .premium-modal {
   background: var(--bg-color, #111827);
 }
 
@@ -301,28 +386,33 @@
   background: var(--bg-secondary, #1f2937);
 }
 
-[data-theme="dark"] .premium-upgrade-pricing-toggle {
+[data-theme="dark"] .premium-modal-pricing-toggle {
   background: var(--bg-secondary, #1f2937);
 }
 
-[data-theme="dark"] .pricing-toggle-option.active {
+[data-theme="dark"] .pricing-toggle-btn.active {
   background: var(--bg-color, #111827);
+}
+
+[data-theme="dark"] .premium-modal-value-prop {
+  background: rgba(10, 157, 88, 0.1);
+}
+
+[data-theme="dark"] .premium-modal-trust {
+  background: rgba(10, 157, 88, 0.1);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .premium-upgrade-modal {
+  .premium-modal {
     max-width: 100%;
     margin: 0;
     border-radius: 16px 16px 0 0;
     max-height: 95vh;
-  }
-
-  .premium-upgrade-modal-content {
     padding: 1.5rem;
   }
 
-  .premium-upgrade-title {
+  .premium-modal-title {
     font-size: 1.5rem;
   }
 
@@ -330,7 +420,11 @@
     font-size: 2.5rem;
   }
 
-  .premium-upgrade-benefits {
-    grid-template-columns: 1fr;
+  .premium-modal-features {
+    gap: 0.75rem;
+  }
+
+  .premium-feature-item {
+    padding: 0.75rem;
   }
 }

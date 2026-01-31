@@ -5,29 +5,31 @@
 
 const FREE_TIER_LIMITS = {
   // Recipe Conversion
-  conversionsPerDay: Infinity, // Unlimited basic conversions
-  batchConversion: false, // No batch conversion
+  conversionsPerMonth: 5, // 5 conversions per month for free users
+  batchConversion: false, // No batch conversion (single only)
   conversionHistory: false, // No history
   
   // Substitutions
-  maxSubstitutions: 3, // Top 3 alternatives only
+  maxSubstitutions: 2, // Top 2 alternatives only (generous free tier)
   advancedSubstitutionLogic: false, // Basic only
   substitutionQualityScores: false, // No scores
   customSubstitutionPreferences: false, // Standard only
   
   // Halal Verification
-  brandLevelVerification: false, // Generic only
+  brandLevelVerification: false, // Ingredient-level only (no brand-level)
   scholarConsultation: false, // No access
   
   // Export & Sharing
   exportFormats: ['txt'], // Text only
   mealPlanningIntegration: false, // No integration
-  shoppingListGeneration: false, // No shopping lists
+  shoppingListGeneration: false, // No shopping lists (PREMIUM ONLY)
+  shoppingListExport: false, // No shopping list export (PREMIUM ONLY)
   
   // Saved Recipes
-  savedRecipes: 5, // Max 5 saved recipes
+  savedRecipes: 10, // Max 10 saved recipes (generous for casual users)
   recipeCollections: false, // No collections
   recipeSearch: false, // No search
+  recipeTags: false, // No tags
   
   // Support
   prioritySupport: false, // Community only
@@ -45,40 +47,42 @@ const FREE_TIER_LIMITS = {
 const PREMIUM_FEATURES = {
   // Recipe Conversion
   conversionsPerDay: Infinity, // Unlimited
-  batchConversion: true, // Up to 10 recipes
-  conversionHistory: true, // Full history with search
+  batchConversion: true, // Up to 5 recipes at once
+  conversionHistory: true, // Last 30 days of history
   
   // Substitutions
-  maxSubstitutions: Infinity, // All alternatives
+  maxSubstitutions: Infinity, // All alternatives (not just top 2)
   advancedSubstitutionLogic: true, // Advanced algorithms
-  substitutionQualityScores: true, // Flavor/texture scores
-  customSubstitutionPreferences: true, // Save preferences
+  substitutionQualityScores: true, // Flavor/texture match scores
+  customSubstitutionPreferences: true, // Save custom preferences
   
   // Halal Verification
-  brandLevelVerification: true, // Brand-specific checks
+  brandLevelVerification: true, // Brand-specific checks (IFANCA, HFSAA)
   scholarConsultation: true, // Priority access
   
   // Export & Sharing
-  exportFormats: ['txt', 'pdf', 'json'], // All formats
-  mealPlanningIntegration: true, // Meal planning apps
-  shoppingListGeneration: true, // Auto-generate lists
+  exportFormats: ['txt', 'pdf', 'json'], // All formats (PDF formatted, JSON for meal planning)
+  mealPlanningIntegration: true, // Meal planning apps integration
+  shoppingListGeneration: true, // Auto-generate shopping lists
+  shoppingListExport: true, // Shopping list export (PREMIUM ONLY)
   
   // Saved Recipes
-  savedRecipes: Infinity, // Unlimited
-  recipeCollections: true, // Organize by cuisine
-  recipeSearch: true, // Full search
+  savedRecipes: Infinity, // Unlimited (vs. 10 free)
+  recipeCollections: true, // Organize by cuisine, meal type
+  recipeSearch: true, // Full search and filter
+  recipeTags: true, // Tag recipes for organization
   
   // Support
-  prioritySupport: true, // 24-hour response
-  featureRequestPriority: true, // Direct access
+  prioritySupport: true, // 48-hour email response (vs. community only)
+  featureRequestPriority: true, // Direct access (vs. community voting)
   
   // Advanced Features
-  nutritionalAnalysis: true, // Halal-focused nutrition
-  recipeScaling: true, // Scale by servings
-  ingredientSubstitutionHistory: true, // Full history
+  nutritionalAnalysis: true, // Basic halal-focused nutrition
+  recipeScaling: true, // Scale recipes by serving size
+  ingredientSubstitutionHistory: true, // Full substitution history
   
   // Early Access
-  earlyAccess: true, // Beta features
+  earlyAccess: true, // Beta features, early ingredient access
 };
 
 /**
@@ -101,33 +105,67 @@ export function isPremiumUser() {
 }
 
 /**
- * Get user's conversion limit for today
- * @returns {number} - Remaining conversions today, or Infinity for premium
+ * Get current month key for conversion tracking
+ * @returns {string} - Format: "YYYY-MM" (e.g., "2024-01")
  */
-export function getRemainingConversionsToday() {
+function getCurrentMonthKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+/**
+ * Get user's conversion count for current month
+ * @returns {number} - Number of conversions this month
+ */
+export function getConversionsThisMonth() {
+  if (isPremiumUser()) {
+    return 0; // Premium users don't need tracking
+  }
+  
+  const monthKey = getCurrentMonthKey();
+  const conversionsKey = `conversions_${monthKey}`;
+  return parseInt(localStorage.getItem(conversionsKey) || '0', 10);
+}
+
+/**
+ * Get remaining conversions for current month
+ * @returns {number} - Remaining conversions this month, or Infinity for premium
+ */
+export function getRemainingConversionsThisMonth() {
   if (isPremiumUser()) {
     return Infinity;
   }
   
-  const today = new Date().toDateString();
-  const conversionsKey = `conversions_${today}`;
-  const conversionsToday = parseInt(localStorage.getItem(conversionsKey) || '0', 10);
-  
-  return Math.max(0, FREE_TIER_LIMITS.conversionsPerDay - conversionsToday);
+  const used = getConversionsThisMonth();
+  const limit = FREE_TIER_LIMITS.conversionsPerMonth;
+  return Math.max(0, limit - used);
 }
 
 /**
  * Track a conversion (increment counter for free users)
+ * @returns {Object} - { success: boolean, remaining: number, limit: number }
  */
 export function trackConversion() {
   if (isPremiumUser()) {
-    return; // No limit for premium
+    return { success: true, remaining: Infinity, limit: Infinity };
   }
   
-  const today = new Date().toDateString();
-  const conversionsKey = `conversions_${today}`;
+  const monthKey = getCurrentMonthKey();
+  const conversionsKey = `conversions_${monthKey}`;
   const current = parseInt(localStorage.getItem(conversionsKey) || '0', 10);
-  localStorage.setItem(conversionsKey, (current + 1).toString());
+  const newCount = current + 1;
+  const limit = FREE_TIER_LIMITS.conversionsPerMonth;
+  
+  localStorage.setItem(conversionsKey, newCount.toString());
+  
+  return {
+    success: true,
+    remaining: Math.max(0, limit - newCount),
+    limit: limit,
+    used: newCount
+  };
 }
 
 /**
@@ -139,7 +177,7 @@ export function canConvert() {
     return true;
   }
   
-  return getRemainingConversionsToday() > 0;
+  return getRemainingConversionsThisMonth() > 0;
 }
 
 /**
@@ -187,14 +225,14 @@ export function canUseFeature(feature) {
 
 /**
  * Get maximum substitutions allowed
- * @returns {number} - Max substitutions (Infinity for premium)
+ * @returns {number} - Max substitutions (Infinity for premium, 2 for free)
  */
 export function getMaxSubstitutions() {
   if (isPremiumUser()) {
-    return Infinity;
+    return Infinity; // All alternatives
   }
   
-  return FREE_TIER_LIMITS.maxSubstitutions || 3;
+  return FREE_TIER_LIMITS.maxSubstitutions || 2; // Top 2 alternatives
 }
 
 /**
@@ -236,27 +274,14 @@ export function canUseBrandVerification() {
 
 /**
  * Get saved recipes limit
- * @returns {number} - Max saved recipes, or Infinity for premium
+ * @returns {number} - Max saved recipes (10 for free, Infinity for premium)
  */
 export function getSavedRecipesLimit() {
   if (isPremiumUser()) {
     return Infinity;
   }
   
-  return FREE_TIER_LIMITS.savedRecipes;
-}
-
-/**
- * Check if user can save more recipes
- * @param {number} currentCount - Current number of saved recipes
- * @returns {boolean}
- */
-export function canSaveRecipe(currentCount) {
-  if (isPremiumUser()) {
-    return true;
-  }
-  
-  return currentCount < FREE_TIER_LIMITS.savedRecipes;
+  return FREE_TIER_LIMITS.savedRecipes; // 10 for free tier
 }
 
 /**

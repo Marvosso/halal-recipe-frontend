@@ -1475,6 +1475,31 @@ html {
   list-style-type: disc;
 }
 
+.alternatives-upgrade-hint {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(10, 157, 88, 0.05);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.upgrade-hint-link {
+  background: none;
+  border: none;
+  color: var(--primary-green, #0A9D58);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  margin-left: 0.25rem;
+  font-weight: 500;
+}
+
+.upgrade-hint-link:hover {
+  color: #08914f;
+}
+
 .alternatives-list li {
   margin-bottom: 0.5rem;
   line-height: 1.6;

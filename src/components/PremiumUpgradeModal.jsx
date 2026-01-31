@@ -1,188 +1,163 @@
-import React, { useState } from "react";
-import { X, Check, Sparkles, Shield, Zap, FileText, Calendar } from "lucide-react";
-import { isPremiumUser } from "../lib/subscription";
+import React, { useState, useEffect } from "react";
+import { X, Check, Sparkles, Heart } from "lucide-react";
+import { UPGRADE_COPY } from "../lib/upgradeCopy";
+import { createCheckoutSession } from "../lib/subscriptionApi";
+import { trackUpgradeModalView, trackUpgradeAttempt, trackCheckoutStart } from "../lib/premiumAnalytics";
 import "./PremiumUpgradeModal.css";
 
-/**
- * Premium Upgrade Modal
- * Displays premium features and pricing
- * 
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether modal is open
- * @param {Function} props.onClose - Close handler
- * @param {string} props.triggerFeature - Feature that triggered upgrade (optional)
- */
 function PremiumUpgradeModal({ isOpen, onClose, triggerFeature = null }) {
-  const [selectedPlan, setSelectedPlan] = useState('monthly');
+  const [selectedPlan, setSelectedPlan] = useState("monthly");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Track modal view
+  useEffect(() => {
+    if (isOpen) {
+      trackUpgradeModalView(triggerFeature, 'modal');
+    }
+  }, [isOpen, triggerFeature]);
 
   if (!isOpen) return null;
 
-  // Don't show if already premium
-  if (isPremiumUser()) {
-    return null;
-  }
+  const copy = UPGRADE_COPY.modal;
+  const pricing = copy.pricing;
 
-  const monthlyPrice = 9.99;
-  const annualPrice = 99;
-  const annualMonthlyEquivalent = annualPrice / 12;
-
-  const handleUpgrade = () => {
-    // TODO: Integrate with payment processor (Stripe)
-    console.log('Upgrade to Premium:', selectedPlan);
-    // Redirect to payment page or open Stripe checkout
-  };
-
-  const handleStartTrial = () => {
-    // TODO: Start free trial
-    console.log('Start free trial');
-    // Redirect to trial signup
-  };
-
-  const premiumFeatures = [
-    {
-      icon: <Shield size={20} />,
-      title: "Brand-Level Halal Verification",
-      description: "Check if specific brands are halal-certified"
-    },
-    {
-      icon: <Zap size={20} />,
-      title: "Advanced Substitution Logic",
-      description: "See all alternatives with flavor/texture match scores"
-    },
-    {
-      icon: <FileText size={20} />,
-      title: "PDF & JSON Export",
-      description: "Export recipes in multiple formats for meal planning"
-    },
-    {
-      icon: <Calendar size={20} />,
-      title: "Meal Planning Integration",
-      description: "Export to meal planning apps and generate shopping lists"
-    },
-    {
-      icon: <Sparkles size={20} />,
-      title: "Unlimited Recipe Saves",
-      description: "Save unlimited recipes with collections and search"
+  const handleUpgrade = async () => {
+    // Track upgrade attempt
+    trackUpgradeAttempt(selectedPlan, triggerFeature, 'modal');
+    
+    setIsLoading(true);
+    try {
+      const checkoutUrl = await createCheckoutSession(selectedPlan);
+      
+      // Track checkout start
+      const sessionId = checkoutUrl.split('session_id=')[1]?.split('&')[0] || 'unknown';
+      trackCheckoutStart(selectedPlan, sessionId);
+      
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      alert("Something went wrong. Please try again.");
+      setIsLoading(false);
     }
-  ];
+  };
+
+  // Get context-specific copy if triggerFeature is provided
+  const getContextualCopy = () => {
+    if (!triggerFeature) return copy;
+    
+    // Check if there's specific copy for this trigger
+    const contextualCopy = UPGRADE_COPY.postConversion?.[triggerFeature];
+    if (contextualCopy) {
+      return {
+        ...copy,
+        title: contextualCopy.title || copy.title,
+        subtitle: contextualCopy.message || copy.subtitle
+      };
+    }
+    
+    return copy;
+  };
+
+  const displayCopy = getContextualCopy();
 
   return (
-    <div className="premium-upgrade-modal-overlay" onClick={onClose}>
-      <div className="premium-upgrade-modal" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="premium-upgrade-modal-close"
-          onClick={onClose}
-          aria-label="Close modal"
-        >
-          <X size={24} />
+    <div className="premium-modal-overlay" onClick={onClose}>
+      <div className="premium-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="premium-modal-close" onClick={onClose} aria-label="Close">
+          <X size={20} />
         </button>
 
-        <div className="premium-upgrade-modal-content">
-          <div className="premium-upgrade-header">
-            <h2 className="premium-upgrade-title">Unlock Premium Features</h2>
-            <p className="premium-upgrade-subtitle">
-              Get advanced halal verification, unlimited saves, and exclusive features
-            </p>
+        <div className="premium-modal-header">
+          <div className="premium-modal-icon">
+            <Sparkles size={32} />
           </div>
+          <h2 className="premium-modal-title">{displayCopy.title}</h2>
+          <p className="premium-modal-subtitle">{displayCopy.subtitle}</p>
+        </div>
 
-          {/* Pricing Toggle */}
-          <div className="premium-upgrade-pricing-toggle">
+        <div className="premium-modal-value-prop">
+          <h3 className="value-prop-headline">{displayCopy.valueProp.headline}</h3>
+          <p className="value-prop-description">{displayCopy.valueProp.description}</p>
+        </div>
+
+        <div className="premium-modal-features">
+          {displayCopy.features.map((feature, index) => (
+            <div key={index} className="premium-feature-item">
+              <div className="premium-feature-icon">{feature.icon}</div>
+              <div className="premium-feature-content">
+                <h4 className="premium-feature-title">{feature.title}</h4>
+                <p className="premium-feature-description">{feature.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="premium-modal-pricing">
+          <div className="pricing-toggle">
             <button
-              className={`pricing-toggle-option ${selectedPlan === 'monthly' ? 'active' : ''}`}
-              onClick={() => setSelectedPlan('monthly')}
+              className={`pricing-toggle-btn ${selectedPlan === "monthly" ? "active" : ""}`}
+              onClick={() => setSelectedPlan("monthly")}
             >
               Monthly
             </button>
             <button
-              className={`pricing-toggle-option ${selectedPlan === 'annual' ? 'active' : ''}`}
-              onClick={() => setSelectedPlan('annual')}
+              className={`pricing-toggle-btn ${selectedPlan === "yearly" ? "active" : ""}`}
+              onClick={() => setSelectedPlan("yearly")}
             >
-              Annual
-              <span className="pricing-badge">Save $20</span>
+              Yearly
+              {pricing.yearly.savings && (
+                <span className="pricing-savings-badge">{pricing.yearly.savings}</span>
+              )}
             </button>
           </div>
 
-          {/* Pricing Display */}
-          <div className="premium-upgrade-pricing">
-            {selectedPlan === 'monthly' ? (
-              <div className="pricing-display">
-                <span className="pricing-amount">${monthlyPrice}</span>
-                <span className="pricing-period">/month</span>
-              </div>
-            ) : (
-              <div className="pricing-display">
-                <span className="pricing-amount">${annualPrice}</span>
-                <span className="pricing-period">/year</span>
-                <span className="pricing-equivalent">
-                  ${annualMonthlyEquivalent.toFixed(2)}/month
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Features List */}
-          <div className="premium-upgrade-features">
-            {premiumFeatures.map((feature, idx) => (
-              <div key={idx} className="premium-feature-item">
-                <div className="premium-feature-icon">
-                  {feature.icon}
-                </div>
-                <div className="premium-feature-content">
-                  <h4 className="premium-feature-title">{feature.title}</h4>
-                  <p className="premium-feature-description">{feature.description}</p>
-                </div>
-                <Check className="premium-feature-check" size={20} />
-              </div>
-            ))}
-          </div>
-
-          {/* Additional Benefits */}
-          <div className="premium-upgrade-benefits">
-            <div className="premium-benefit-item">
-              <Check size={16} />
-              <span>Unlimited recipe conversions</span>
+          <div className="pricing-display">
+            <div className="pricing-amount">
+              <span className="pricing-price">{pricing[selectedPlan].price}</span>
+              <span className="pricing-period">{pricing[selectedPlan].period}</span>
             </div>
-            <div className="premium-benefit-item">
-              <Check size={16} />
-              <span>Priority support (24-hour response)</span>
-            </div>
-            <div className="premium-benefit-item">
-              <Check size={16} />
-              <span>Early access to new features</span>
-            </div>
-            <div className="premium-benefit-item">
-              <Check size={16} />
-              <span>Cancel anytime</span>
-            </div>
+            <p className="pricing-note">{pricing[selectedPlan].note}</p>
           </div>
+        </div>
 
-          {/* CTA Buttons */}
-          <div className="premium-upgrade-actions">
-            <button
-              className="premium-upgrade-cta primary"
-              onClick={handleUpgrade}
-            >
-              {selectedPlan === 'monthly' 
-                ? `Upgrade for $${monthlyPrice}/month`
-                : `Upgrade for $${annualPrice}/year`
-              }
-            </button>
-            <button
-              className="premium-upgrade-cta secondary"
-              onClick={handleStartTrial}
-            >
-              Start Free Trial
-            </button>
-          </div>
+        <div className="premium-modal-cta">
+          <button
+            className="premium-upgrade-btn primary"
+            onClick={handleUpgrade}
+            disabled={isLoading}
+          >
+            {isLoading ? "Processing..." : "Upgrade Now"}
+          </button>
+          <button
+            className="premium-upgrade-btn secondary"
+            onClick={onClose}
+            disabled={isLoading}
+          >
+            Maybe Later
+          </button>
+        </div>
 
-          {/* Trust Elements */}
-          <div className="premium-upgrade-trust">
-            <p className="trust-text">
-              ✓ 30-day money-back guarantee
-              <br />
-              ✓ No credit card required for trial
-            </p>
+        <div className="premium-modal-trust">
+          <div className="trust-item">
+            <Check size={16} />
+            <span>{displayCopy.trust.guarantee}</span>
           </div>
+          <div className="trust-item">
+            <Check size={16} />
+            <span>{displayCopy.trust.support}</span>
+          </div>
+          <div className="trust-item">
+            <Check size={16} />
+            <span>{displayCopy.trust.cancel}</span>
+          </div>
+        </div>
+
+        <div className="premium-modal-footer">
+          <p className="footer-message">
+            <Heart size={14} className="footer-heart" />
+            {displayCopy.footer.why}
+          </p>
+          <p className="footer-thanks">{displayCopy.footer.thanks}</p>
         </div>
       </div>
     </div>
