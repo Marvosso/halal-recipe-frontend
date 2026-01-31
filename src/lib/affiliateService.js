@@ -6,8 +6,6 @@
 
 import { autoRouteAffiliateLinks } from './affiliateRouting';
 
-import { autoRouteAffiliateLinks } from './affiliateRouting';
-
 /**
  * Get affiliate links for a substitute ingredient
  * Now includes region-aware routing
