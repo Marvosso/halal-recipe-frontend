@@ -58,6 +58,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [isOffline, setIsOffline] = useState(false);
   const [showCachedResult, setShowCachedResult] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeTriggerFeature, setUpgradeTriggerFeature] = useState(null);
 
   // Listen for auth modal trigger and other events
   useEffect(() => {
