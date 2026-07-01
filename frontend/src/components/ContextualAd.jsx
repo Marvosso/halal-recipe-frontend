@@ -24,6 +24,7 @@ function ContextualAd({ placement, slotId, className = "" }) {
     slotId ||
     (placement === "ingredient_lookup" && import.meta.env?.VITE_ADSENSE_SLOT_LOOKUP) ||
     (placement === "recipe_conversion" && import.meta.env?.VITE_ADSENSE_SLOT_CONVERSION) ||
+    import.meta.env?.VITE_ADSENSE_SLOT ||
     "";
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Search, Refr
 import AffiliateLink from "./AffiliateLink";
 import QuickLookup from "./QuickLookup";
 import { getEnabledProviders } from "../config/affiliateProviderConfig";
+import { isAffiliateRecommendationsEnabled } from "../lib/monetization";
 import { VERDICT_LABELS, VALID_VERDICTS } from "../data/seoVerdicts";
 import { getIngredientPageBySlug } from "../data/ingredientPageConfig";
 import "./SEOPageLayout.css";
@@ -35,7 +36,10 @@ function SEOPageLayout({
   canonical = null,
 }) {
   const [openFaqItems, setOpenFaqItems] = useState(new Set());
-  const shopProviders = useMemo(() => getEnabledProviders().slice(0, 2), []);
+  const shopProviders = useMemo(
+    () => (isAffiliateRecommendationsEnabled() ? getEnabledProviders().slice(0, 2) : []),
+    []
+  );
 
   const principles = scholarlyBasis.length > 0 ? scholarlyBasis : islamicEvidence;
 

@@ -12,7 +12,7 @@
     "test:lookup": "node --test src/lib/lookup/__tests__/lookupCache.test.js",
     "test:recipe": "node --test src/lib/recipe/__tests__/recipeConversionModel.test.js",
     "test:confidence": "node --test ../shared/contracts/__tests__/confidenceV1.test.js ../shared/contracts/__tests__/recipeConfidence.test.js",
-    "test:monetization": "node --test src/lib/monetization/__tests__/monetization.consolidation.test.js",
+    "test:monetization": "node --test src/lib/monetization/__tests__/monetization.consolidation.test.js src/lib/monetization/__tests__/config.test.js",
     "test:regression": "node --test ../shared/regression/__tests__/contractValidators.test.js src/lib/regression/__tests__/regression.frontend.test.js src/lib/savedRecipes/__tests__/localStorage.test.js"
   },
   "dependencies": {

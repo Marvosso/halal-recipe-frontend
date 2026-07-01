@@ -1,13 +1,13 @@
 # Light Contextual Monetization
 
-Halal Kitchen uses **contextual substitute recommendations** (affiliate, lazy-loaded) by default. **Display ads (AdSense)** are opt-in only and never appear above search or convert actions.
+Halal Kitchen is a **free** product monetized through **display ads (AdSense)**. **Affiliate substitute recommendations** are off by default until traffic supports affiliate programs.
 
 ## Feature flags
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_ENABLE_AFFILIATE_RECOMMENDATIONS` | `true` | Show “Find halal alternatives” tips after lookup when substitutes exist |
-| `VITE_ENABLE_CONTEXTUAL_ADS` | `false` | Enable AdSense slots (requires `VITE_ADSENSE_CLIENT` + slot IDs) |
+| `VITE_ENABLE_AFFILIATE_RECOMMENDATIONS` | `false` | Show “Find halal alternatives” shop tips after lookup/conversion |
+| `VITE_ENABLE_CONTEXTUAL_ADS` | `true` | Enable AdSense slots (requires slot IDs via env) |
 
 Affiliate UI goes through `frontend/src/lib/monetization/` (`affiliateGateway.js`).
 

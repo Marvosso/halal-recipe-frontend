@@ -150,8 +150,8 @@ function HomePage() {
               </dd>
               <dt>How do you make money?</dt>
               <dd>
-                Halal Kitchen may show ads (for example through Google AdSense) and may use affiliate links
-                where relevant. See our <Link to="/privacy">Privacy Policy</Link> for how ads and analytics work.
+                Halal Kitchen is free. We support the site with display ads (for example through Google
+                AdSense). See our <Link to="/privacy">Privacy Policy</Link> for how ads and analytics work.
               </dd>
             </dl>
           </article>
